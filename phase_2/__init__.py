@@ -4,6 +4,8 @@ import json
 import os
 import csv
 
+SECRET_KEY = environ.get('OTREE_SECRET_KEY')
+
 doc = """
 Phase 2: 7-Day Asynchronous Network Experiment with Gamified Rewards.
 Includes dynamic pool assignment for 10 High / 10 Low Concern Participants.
