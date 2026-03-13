@@ -1,0 +1,48 @@
+{{ block title }}Final Opinions{{ endblock }}
+
+{{ block content }}
+    <style>
+        .likert-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .likert-anchor {
+            font-weight: 500;
+            color: #555;
+            flex: 1;
+            font-size: 0.9rem;
+        }
+        .anchor-left {
+            text-align: right;
+        }
+        .anchor-right {
+            text-align: left;
+        }
+        .likert-inputs .mb-3 {
+            margin-bottom: 0 !important;
+        }
+    </style>
+
+    <p class="mb-4">Please indicate your response to the following items based on your current views at the end of this 7-day experiment.</p>
+
+    {{ for q in questions_data }}
+        <div class="mb-4 shadow-sm p-4 border rounded bg-light">
+            <p class="fw-bold mb-2 text-center" style="font-size: 1.05rem;">{{ q.text }}</p>
+            
+            <div class="likert-container">
+                <div class="likert-anchor anchor-left">{{ q.left }}</div>
+                <div class="likert-inputs">
+                    {{ formfield q.name label="" }}
+                </div>
+                <div class="likert-anchor anchor-right">{{ q.right }}</div>
+            </div>
+        </div>
+    {{ endfor }}
+
+    <div class="text-center mt-5 mb-4">
+        {{ next_button }}
+    </div>
+{{ endblock }}

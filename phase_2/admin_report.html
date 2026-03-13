@@ -1,0 +1,73 @@
+<div class="container-fluid mb-5">
+    <h3 class="mb-4">Phase 2: Network & Opinion Diagnostics</h3>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Session Overview</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-0">Total Participants Tracked: <strong>{{ total_players }}</strong></p>
+        </div>
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Incoming Feed Distribution (All Rounds)</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">Percentage of article leanings appearing in feeds, separated by the participant's assigned category.</p>
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Participant Category</th>
+                        <th>Article Leaning</th>
+                        <th>Feed Presence (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ for cat, leanings in feed_lean_percentages.items() }}
+                        <tr><td colspan="3" class="ps-3 text-secondary" style="background-color: #fcfcfc;"><em>{{ cat }}</em></td></tr>
+                        {{ for lean, pct in leanings.items() }}
+                        <tr>
+                            <td></td>
+                            <td class="ps-4">{{ lean }}</td>
+                            <td>{{ pct }}%</td>
+                        </tr>
+                        {{ endfor }}
+                    {{ endfor }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Opinion Change (Phase 2 Final vs Phase 1 Baseline)</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted small">Average shift in Likert points (Final - Baseline). Positive values indicate a shift towards "A great deal / Strongly Favor". Requires baseline data in participant.vars.</p>
+            <table class="table table-bordered table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>Participant Category</th>
+                        <th>Opinion 1 (Change)</th>
+                        <th>Opinion 2 (Likelihood)</th>
+                        <th>Opinion 3 (Responsibility)</th>
+                        <th>Opinion 4 (Taxes)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ for cat, changes in avg_opinion_change.items() }}
+                    <tr>
+                        <td><strong>{{ cat }}</strong></td>
+                        <td>{{ changes.opinion_1 }}</td>
+                        <td>{{ changes.opinion_2 }}</td>
+                        <td>{{ changes.opinion_3 }}</td>
+                        <td>{{ changes.opinion_4 }}</td>
+                    </tr>
+                    {{ endfor }}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

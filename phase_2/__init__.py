@@ -1,0 +1,360 @@
+from otree.api import *
+import random
+import json
+import os
+import csv
+
+doc = """
+Phase 2: 7-Day Asynchronous Network Experiment with Gamified Rewards.
+Includes dynamic pool assignment for 10 High / 10 Low Concern Participants.
+"""
+
+class Constants(BaseConstants):
+    name_in_url = 'phase_2'
+    players_per_group = 20
+    num_rounds = 7
+    
+    PAY_PER_ROUND = 0.50
+    BONUS_AMOUNT = 5.00
+    MAX_ALLOWED_MISSES = 1
+    
+    # Load Network Topology
+    json_path = os.path.join(os.path.dirname(__file__), 'network_map.json')
+    if os.path.exists(json_path):
+        with open(json_path, encoding='utf-8') as f:
+            raw_network = json.load(f)
+            NETWORK = {int(k): v for k, v in raw_network.items()}
+    else:
+        NETWORK = {}
+
+    # Load News Items
+    csv_path = os.path.join(os.path.dirname(__file__), 'news_items.csv')
+    with open(csv_path, encoding='utf-8') as f:
+        NEWS_ITEMS = list(csv.DictReader(f))
+
+    # Load Phase 1 Participant Data (Contains ALL 30 invited participants)
+    mapping_path = os.path.join(os.path.dirname(__file__), 'participant_mapping.json')
+    if os.path.exists(mapping_path):
+        with open(mapping_path, encoding='utf-8') as f:
+            MAPPING = json.load(f)
+    else:
+        MAPPING = {}
+
+    QUESTIONS = {
+        'opinion_1': {'text': "To what extent do you believe the world's climate is currently changing?", 'left': "Not at all", 'right': "A great deal"},
+        'opinion_2': {'text': "How likely do you think it is that climate change will lead to significant natural disasters, such as floods or droughts?", 'left': "Not at all likely", 'right': "Extremely likely"},
+        'opinion_3': {'text': "To what extent do you feel a personal responsibility to try to reduce climate change?", 'left': "Not at all", 'right': "A great deal"},
+        'opinion_4': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels (oil, gas, coal) to reduce climate change?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}
+    }
+
+class Subsession(BaseSubsession):
+    pass
+
+def creating_session(subsession: Subsession):
+    pass # Assignment happens dynamically upon arrival in ArrivalGatekeeper
+
+def vars_for_admin_report(subsession: Subsession):
+    players = subsession.get_players()
+    feed_lean_by_cat = {'High_Concern': {}, 'Low_Concern': {}}
+    feed_totals = {'High_Concern': 0, 'Low_Concern': 0}
+    
+    for p in players:
+        cat = p.field_maybe_none('category') or "Unknown"
+        if cat not in feed_lean_by_cat:
+            feed_lean_by_cat[cat] = {}
+            feed_totals[cat] = 0
+            
+        for past_p in p.in_all_rounds():
+            feed_str = past_p.field_maybe_none('incoming_feed')
+            if feed_str and feed_str != "[]":
+                try:
+                    feed_items = json.loads(feed_str)
+                    for item in feed_items:
+                        lean = item.get('leaning', 'Unknown')
+                        feed_lean_by_cat[cat][lean] = feed_lean_by_cat[cat].get(lean, 0) + 1
+                        feed_totals[cat] += 1
+                except json.JSONDecodeError:
+                    pass
+
+    feed_lean_percentages = {}
+    for cat, leanings in feed_lean_by_cat.items():
+        feed_lean_percentages[cat] = {}
+        total = feed_totals[cat]
+        if total > 0:
+            for lean, count in leanings.items():
+                feed_lean_percentages[cat][lean] = round((count / total) * 100, 1)
+
+    opinion_change_lists = {'High_Concern': {1: [], 2: [], 3: [], 4: []}, 
+                            'Low_Concern': {1: [], 2: [], 3: [], 4: []}}
+                            
+    for p in players:
+        cat = p.field_maybe_none('category') or "Unknown"
+        if cat not in opinion_change_lists:
+            opinion_change_lists[cat] = {1: [], 2: [], 3: [], 4: []}
+            
+        for past_p in p.in_all_rounds():
+            if past_p.field_maybe_none('opinion_1') is not None:
+                for i in range(1, 5):
+                    final_val = past_p.field_maybe_none(f'opinion_{i}')
+                    baseline_val = getattr(p.participant, f'baseline_opinion_{i}', None)
+                    
+                    if final_val is not None and baseline_val is not None:
+                        change = final_val - baseline_val
+                        opinion_change_lists[cat][i].append(change)
+                break 
+
+    avg_opinion_change = {}
+    for cat, ops in opinion_change_lists.items():
+        avg_opinion_change[cat] = {}
+        for i in range(1, 5):
+            vals = ops[i]
+            if vals:
+                avg = sum(vals) / len(vals)
+                avg_str = f"+{avg:.2f}" if avg > 0 else f"{avg:.2f}"
+                avg_opinion_change[cat][f'opinion_{i}'] = avg_str
+            else:
+                avg_opinion_change[cat][f'opinion_{i}'] = "No Data"
+
+    return {
+        'feed_lean_percentages': feed_lean_percentages,
+        'avg_opinion_change': avg_opinion_change,
+        'total_players': len(players)
+    }
+
+class Group(BaseGroup):
+    pass
+
+class Player(BasePlayer):
+    node_id = models.IntegerField(blank=True, null=True)
+    category = models.StringField(blank=True) 
+    screened_out = models.BooleanField(initial=False)
+    
+    incoming_feed = models.LongStringField(initial="[]", blank=True)
+    outgoing_shares = models.LongStringField(initial="[]", blank=True)
+    average_feed_size = models.FloatField(blank=True)
+    max_feed_size = models.IntegerField(blank=True)
+    average_pending_items = models.FloatField(blank=True)
+    max_pending_items = models.IntegerField(blank=True)
+    total_time_on_feed = models.FloatField(blank=True)
+    
+    participated_this_round = models.BooleanField(initial=False)
+    
+    opinion_1 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
+    opinion_2 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
+    opinion_3 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
+    opinion_4 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
+    satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal, blank=True)
+    clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the daily instructions?", widget=widgets.RadioSelectHorizontal, blank=True)
+    echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="To what extent did you feel you were in an 'echo chamber'?", widget=widgets.RadioSelectHorizontal, blank=True)
+    neighbor_similarity = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="How similar do you think your network neighbors' opinions were to your own?", widget=widgets.RadioSelectHorizontal, blank=True)
+    final_comments = models.LongStringField(label="Comments or questions regarding the experiment.", blank=True)
+
+# --- PAGES ---
+
+class ArrivalGatekeeper(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == 1
+
+    @staticmethod
+    def before_next_page(player: Player, timeout_happened):
+        p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
+        player.participant.prolific_id = p_label
+        
+        # Pull baseline data from mapping
+        if p_label in Constants.MAPPING:
+            data = Constants.MAPPING[p_label]
+            cat = data.get('category')
+            player.participant.assigned_category = cat
+            player.participant.baseline_opinion_1 = data.get('opinion_1')
+            player.participant.baseline_opinion_2 = data.get('opinion_2')
+            player.participant.baseline_opinion_3 = data.get('opinion_3')
+            player.participant.baseline_opinion_4 = data.get('opinion_4')
+        else:
+            cat = 'High_Concern' if player.id_in_group <= 10 else 'Low_Concern'
+            player.participant.assigned_category = cat
+
+        player.category = cat
+
+        # DYNAMIC POOL ASSIGNMENT
+        all_players = player.subsession.get_players()
+        assigned_nodes = [p.node_id for p in all_players if p.node_id is not None]
+        
+        target_nodes = list(range(1, 11)) if cat == 'High_Concern' else list(range(11, 21))
+        available_nodes = [n for n in target_nodes if n not in assigned_nodes]
+
+        if available_nodes:
+            assigned_node = min(available_nodes)
+            player.node_id = assigned_node
+            player.participant.node_id = assigned_node
+        else:
+            player.screened_out = True
+
+class CapacityScreenout(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == 1 and player.field_maybe_none('screened_out') == True
+
+class FeedTaskGatekeeper(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.field_maybe_none('screened_out') != True
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        # Ensure node_id is synced across rounds
+        player.node_id = getattr(player.participant, 'node_id', None)
+        player.category = getattr(player.participant, 'assigned_category', None)
+
+        if 'backlog' not in player.participant.vars:
+            player.participant.vars['backlog'] = {}
+
+        current_round = player.round_number
+        backlog = player.participant.vars['backlog']
+        
+        if current_round > 1:
+            prev_subsession = player.subsession.in_round(current_round - 1)
+            neighbors = Constants.NETWORK.get(player.node_id, [])
+            
+            for n_id in neighbors:
+                n_player = next((p for p in prev_subsession.get_players() if p.node_id == n_id), None)
+                if n_player and n_player.field_maybe_none('outgoing_shares'):
+                    n_shares = json.loads(n_player.outgoing_shares)
+                    for item_id in n_shares:
+                        backlog[item_id] = backlog.get(item_id, 0) + 1
+
+        feed_item_ids = []
+
+        if len(backlog) > 4:
+            pool = list(backlog.keys())
+            weights = [backlog[k] for k in pool]
+            while len(feed_item_ids) < 4 and pool:
+                choice = random.choices(pool, weights=weights, k=1)[0]
+                feed_item_ids.append(choice)
+                idx = pool.index(choice)
+                pool.pop(idx)
+                weights.pop(idx)
+        else:
+            feed_item_ids = list(backlog.keys())
+
+        if len(feed_item_ids) < 4:
+            needed = 4 - len(feed_item_ids)
+            all_ids = [item['id'] for item in Constants.NEWS_ITEMS]
+            available_pool = [i for i in all_ids if i not in feed_item_ids]
+            padding_items = random.sample(available_pool, needed)
+            feed_item_ids.extend(padding_items)
+
+        for item_id in feed_item_ids:
+            if item_id in backlog:
+                del backlog[item_id]
+
+        feed_items = []
+        for item_id in feed_item_ids:
+            item_data = next((item for item in Constants.NEWS_ITEMS if item['id'] == item_id), None)
+            if item_data:
+                feed_items.append(item_data)
+                
+        player.incoming_feed = json.dumps(feed_items)
+        return {}
+
+class FeedTask(Page):
+    form_model = 'player'
+    form_fields = [
+        'outgoing_shares', 'average_feed_size', 'max_feed_size', 
+        'average_pending_items', 'max_pending_items', 'total_time_on_feed'
+    ]
+    
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.field_maybe_none('screened_out') != True
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        past_rounds = player.in_previous_rounds()
+        completed_rounds = sum([1 for p in past_rounds if p.field_maybe_none('participated_this_round') == True])
+        missed_rounds = (player.round_number - 1) - completed_rounds
+        
+        current_earnings = completed_rounds * Constants.PAY_PER_ROUND
+        shield_active = missed_rounds <= 0
+        chest_active = missed_rounds <= Constants.MAX_ALLOWED_MISSES
+        
+        return {
+            'completed_rounds': completed_rounds,
+            'current_earnings': f"${current_earnings:.2f}",
+            'shield_active': shield_active,
+            'chest_active': chest_active,
+            'bonus_amount': f"${Constants.BONUS_AMOUNT:.2f}"
+        }
+
+    @staticmethod
+    def js_vars(player: Player):
+        return {'incoming_feed': json.loads(player.field_maybe_none('incoming_feed') or "[]")}
+
+    @staticmethod
+    def before_next_page(player: Player, timeout_happened):
+        if not timeout_happened:
+            player.participated_this_round = True
+
+class FinalOpinions(Page):
+    form_model = 'player'
+    form_fields = ['opinion_1', 'opinion_2', 'opinion_3', 'opinion_4']
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == Constants.num_rounds and player.field_maybe_none('screened_out') != True
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        q_keys = ['opinion_1', 'opinion_2', 'opinion_3', 'opinion_4']
+        questions_data = [{'name': f, 'text': Constants.QUESTIONS[f]['text'], 'left': Constants.QUESTIONS[f]['left'], 'right': Constants.QUESTIONS[f]['right']} for f in q_keys]
+        return {'questions_data': questions_data}
+
+class FinalFeedback(Page):
+    form_model = 'player'
+    form_fields = ['satisfaction', 'clarity', 'echo_chamber', 'neighbor_similarity', 'final_comments']
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == Constants.num_rounds and player.field_maybe_none('screened_out') != True
+
+class EndOfDayWait(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number < Constants.num_rounds and player.field_maybe_none('screened_out') != True
+
+class CompletionRedirect(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == Constants.num_rounds and player.field_maybe_none('screened_out') != True
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        all_rounds = player.in_all_rounds()
+        completed_rounds = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
+        missed_rounds = Constants.num_rounds - completed_rounds
+        
+        base_pay = completed_rounds * Constants.PAY_PER_ROUND
+        bonus = Constants.BONUS_AMOUNT if missed_rounds <= Constants.MAX_ALLOWED_MISSES else 0.00
+        total_pay = base_pay + bonus
+        
+        lottery_eligible = (missed_rounds == 0)
+        completion_url = player.session.config.get('completion_url', '')
+        
+        return {
+            'completed_rounds': completed_rounds,
+            'base_pay': f"${base_pay:.2f}",
+            'bonus_amount': f"${bonus:.2f}",
+            'total_pay': f"${total_pay:.2f}",
+            'earned_bonus': bonus > 0,
+            'lottery_eligible': lottery_eligible,
+            'completion_url': completion_url
+        }
+
+page_sequence = [
+    ArrivalGatekeeper, 
+    CapacityScreenout, 
+    FeedTaskGatekeeper, 
+    FeedTask, 
+    FinalOpinions, 
+    FinalFeedback, 
+    EndOfDayWait, 
+    CompletionRedirect
+]

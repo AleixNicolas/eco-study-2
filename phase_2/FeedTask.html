@@ -1,0 +1,146 @@
+{{ block title }}Daily News Feed - Round {{ player.round_number }}{{ endblock }}
+{{ block content }}
+
+<style>
+    .mobile-article-body {
+        display: none;
+        background-color: #fff;
+        border-left: 3px solid #0d6efd;
+    }
+</style>
+
+<div class="alert alert-secondary d-flex justify-content-between align-items-center mb-4 shadow-sm">
+    <div>
+        <strong>Base Earnings:</strong> <span class="badge bg-success" style="font-size: 1rem;">{{ current_earnings }}</span>
+    </div>
+    <div class="d-flex align-items-center" style="gap: 15px;">
+        <div class="text-center">
+            {% if shield_active %}
+                <span style="font-size: 1.5rem;" title="Shield Intact: You can miss one round without penalty.">🛡️</span>
+                <div style="font-size: 0.7rem;" class="text-success">Shield Active</div>
+            {% else %}
+                <span style="font-size: 1.5rem; opacity: 0.3;" title="Shield Broken">🛡️</span>
+                <div style="font-size: 0.7rem;" class="text-danger">Shield Broken</div>
+            {% endif %}
+        </div>
+        <div class="text-center">
+            {% if chest_active %}
+                <span style="font-size: 1.5rem;" title="{{ bonus_amount }} Bonus Secured">🧰</span>
+                <div style="font-size: 0.7rem;" class="text-success">{{ bonus_amount }} Secured</div>
+            {% else %}
+                <span style="font-size: 1.5rem; opacity: 0.3;" title="Bonus Lost">🧰</span>
+                <div style="font-size: 0.7rem;" class="text-danger">Bonus Lost</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<input type="hidden" name="outgoing_shares" id="outgoing_shares">
+<input type="hidden" name="average_feed_size" id="average_feed_size">
+<input type="hidden" name="max_feed_size" id="max_feed_size">
+<input type="hidden" name="average_pending_items" id="average_pending_items">
+<input type="hidden" name="max_pending_items" id="max_pending_items">
+<input type="hidden" name="total_time_on_feed" id="total_time_on_feed">
+
+<div class="row">
+    
+    <div class="col-md-6 order-1 order-md-2 mb-3 d-none d-md-block">
+        <div id="reading-pane" class="card shadow-sm p-4 sticky-top" style="top: 10px; min-height: 250px; max-height: 45vh; overflow-y: auto;">
+            <h5 id="display-headline" class="text-muted">Select an article from the list below.</h5>
+            <p id="display-body"></p>
+        </div>
+    </div>
+
+    <div class="col-md-6 order-2 order-md-1" style="max-height: 80vh; overflow-y: auto; padding-bottom: 20px;">
+        <p class="text-muted d-block d-md-none">Review the news articles below. Tap "Read Story" to expand.</p>
+        <p class="text-muted d-none d-md-block">Review the news articles below. Read the story before sharing.</p>
+        
+        <div id="feed-container"></div>
+    </div>
+</div>
+
+<div class="text-center mt-4 mb-5">
+    <button type="button" class="btn btn-primary btn-lg" onclick="submitFeed()">Complete Round</button>
+</div>
+
+<script>
+    let startTime = Date.now();
+    let feedData = js_vars.incoming_feed;
+    let container = document.getElementById('feed-container');
+    let feedSize = feedData.length;
+    let backlogChecks = [];
+
+    if (feedSize === 0) {
+        container.innerHTML = "<div class='alert alert-info'>Your neighbors did not share any new items today.</div>";
+    } else {
+        feedData.forEach((item, index) => {
+            let card = document.createElement('div');
+            card.className = "card bg-light mb-2 p-3 news-item";
+            
+            // Generate the responsive HTML
+            card.innerHTML = `
+                <h6 style="color: #333;">${item.headline}</h6>
+                
+                <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-3 mt-2 text-muted d-md-none" style="font-size: 0.9rem;">
+                    ${item.additional_text}
+                </div>
+
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-2">
+                    <div class="form-check mb-2 mb-md-0">
+                        <input class="form-check-input share-checkbox" type="checkbox" value="${item.id}" id="check_${index}">
+                        <label class="form-check-label" for="check_${index}">Share with my network</label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-md-2 flex-shrink-0" onclick="showArticle(${index})">
+                        Read Story
+                    </button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function showArticle(index) {
+        let item = feedData[index];
+        
+        // Desktop Behavior
+        if (window.innerWidth >= 768) {
+            document.getElementById('display-headline').innerText = item.headline;
+            document.getElementById('display-body').innerText = item.additional_text;
+        } 
+        // Mobile Accordion Behavior
+        else {
+            let mobileContent = document.getElementById('mobile_body_' + index);
+            
+            if (mobileContent.style.display === 'block') {
+                mobileContent.style.display = 'none';
+            } else {
+                document.querySelectorAll('.mobile-article-body').forEach(el => el.style.display = 'none');
+                mobileContent.style.display = 'block';
+            }
+        }
+    }
+
+    setInterval(() => {
+        let unchecked = document.querySelectorAll('.share-checkbox:not(:checked)').length;
+        backlogChecks.push(unchecked);
+    }, 500);
+
+    function submitFeed() {
+        let shares = [];
+        document.querySelectorAll('.share-checkbox:checked').forEach(cb => shares.push(cb.value));
+        document.getElementById('outgoing_shares').value = JSON.stringify(shares);
+        
+        document.getElementById('max_feed_size').value = feedSize;
+        document.getElementById('average_feed_size').value = feedSize.toFixed(2);
+        
+        let maxPending = backlogChecks.length > 0 ? Math.max(...backlogChecks) : feedSize;
+        let avgPending = backlogChecks.length > 0 ? (backlogChecks.reduce((a,b) => a+b, 0) / backlogChecks.length) : feedSize;
+        
+        document.getElementById('max_pending_items').value = maxPending;
+        document.getElementById('average_pending_items').value = avgPending.toFixed(2);
+        document.getElementById('total_time_on_feed').value = (Date.now() - startTime) / 1000;
+
+        document.getElementById('form').submit();
+    }
+</script>
+{{ endblock }}
