@@ -1,5 +1,9 @@
 from os import environ
 
+# --- REQUIRED SECURITY SETTINGS ---
+# This looks for OTREE_SECRET_KEY in your Heroku Config Vars
+SECRET_KEY = environ.get('OTREE_SECRET_KEY')
+
 SESSION_CONFIGS = [
     dict(
         name='phase2_main_network',
@@ -11,7 +15,9 @@ SESSION_CONFIGS = [
 ]
 
 SESSION_CONFIG_DEFAULTS = dict(
-    real_world_currency_per_point=1.00, participation_fee=0.00, doc=""
+    real_world_currency_per_point=1.00, 
+    participation_fee=0.00, 
+    doc=""
 )
 
 PARTICIPANT_FIELDS = [
@@ -34,5 +40,11 @@ ROOMS = [
 LANGUAGE_CODE = 'en'
 REAL_WORLD_CURRENCY_CODE = 'USD'
 USE_POINTS = True
+
+# --- ADMIN ACCESS ---
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = environ.get('OTREE_ADMIN_PASSWORD', 'password')
+
+# --- OTREE SETUP ---
+DEMO_PAGE_INTRO_HTML = """ """
+DEBUG = environ.get('OTREE_PRODUCTION') is None
