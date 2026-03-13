@@ -164,6 +164,7 @@ class ArrivalGatekeeper(Page):
         return player.round_number == 1
 
     @staticmethod
+
     def before_next_page(player: Player, timeout_happened):
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
         player.participant.prolific_id = p_label
@@ -185,7 +186,13 @@ class ArrivalGatekeeper(Page):
 
         # DYNAMIC POOL ASSIGNMENT
         all_players = player.subsession.get_players()
-        assigned_nodes = [p.node_id for p in all_players if p.node_id is not None]
+        
+        # FIX: Use field_maybe_none() to prevent the TypeError crash
+        assigned_nodes = [
+            p.field_maybe_none('node_id') 
+            for p in all_players 
+            if p.field_maybe_none('node_id') is not None
+        ]
         
         target_nodes = list(range(1, 11)) if cat == 'High_Concern' else list(range(11, 21))
         available_nodes = [n for n in target_nodes if n not in assigned_nodes]
