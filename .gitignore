@@ -11,3 +11,9 @@ __pycache__/
 *.py[cod]
 .DS_Store
 *.otreezip
+
+# Experiment specific sensitive data
+participant_mapping.json
+
+# Local environment variables
+.env

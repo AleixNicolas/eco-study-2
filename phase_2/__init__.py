@@ -29,14 +29,21 @@ class Constants(BaseConstants):
 
     # Load News Items
     csv_path = os.path.join(os.path.dirname(__file__), 'news_items.csv')
-    with open(csv_path, encoding='utf-8') as f:
-        NEWS_ITEMS = list(csv.DictReader(f))
+    if os.path.exists(csv_path):
+        with open(csv_path, encoding='utf-8') as f:
+            NEWS_ITEMS = list(csv.DictReader(f))
+    else:
+        NEWS_ITEMS = []
 
-    # Load Phase 1 Participant Data (Contains ALL 30 invited participants)
-    mapping_path = os.path.join(os.path.dirname(__file__), 'participant_mapping.json')
-    if os.path.exists(mapping_path):
-        with open(mapping_path, encoding='utf-8') as f:
-            MAPPING = json.load(f)
+    # --- SECURE MAPPING LOAD ---
+    # Loads directly from Heroku's encrypted environment variables
+    mapping_data = os.environ.get('PARTICIPANT_MAPPING')
+    if mapping_data:
+        try:
+            MAPPING = json.loads(mapping_data)
+        except json.JSONDecodeError:
+            print("CRITICAL ERROR: PARTICIPANT_MAPPING environment variable is not valid JSON.")
+            MAPPING = {}
     else:
         MAPPING = {}
 
