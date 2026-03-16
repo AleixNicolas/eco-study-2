@@ -4,11 +4,7 @@ from os import environ
 SECRET_KEY = environ.get('OTREE_SECRET_KEY', '2003881942849')
 
 SESSION_CONFIGS = [
-    dict(
-        name='phase_1_intake',
-        app_sequence=['phase_1'],
-        num_demo_participants=3,
-    ),
+    # Removed the phase_1 config block from here!
     dict(
         name='phase2_main_network',
         display_name="Phase 2: 7-Day Network Experiment",
