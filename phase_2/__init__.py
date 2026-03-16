@@ -3,11 +3,13 @@ import random
 import json
 import os
 import csv
+import threading
 from datetime import datetime, timedelta, timezone
 
 doc = """
 Phase 2: 7-Day Asynchronous Network Experiment with Gamified Rewards.
 Includes dynamic pool assignment for 10 High / 10 Low Concern Participants.
+Contains Thread-Safe Action Buffer for concurrent user advancement.
 """
 
 class Constants(BaseConstants):
@@ -51,11 +53,84 @@ class Constants(BaseConstants):
         'opinion_4': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels (oil, gas, coal) to reduce climate change?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}
     }
 
+# ==========================================
+# Python State Manager (Buffer & Lock)
+# ==========================================
+class ActionStateManager:
+    """
+    Python equivalent of the JS Buffer. Manages concurrent actions,
+    filters them, and locks the state during advancement.
+    """
+    @staticmethod
+    def register_action(session, user_id, action_data):
+        if session.vars.get('is_advancing', False):
+            print(f"[Rejected] Action from {user_id} blocked by advancement lock.")
+            return False
+            
+        if 'action_buffer' not in session.vars:
+            session.vars['action_buffer'] = []
+            
+        session.vars['action_buffer'].append({
+            'user_id': user_id, 
+            'action_data': action_data,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+        return True
+
+    @staticmethod
+    def filter_valid_actions(buffer):
+        processed_users = set()
+        valid_actions = []
+        
+        for entry in buffer:
+            u_id = entry['user_id']
+            # Filter out duplicates
+            if u_id in processed_users:
+                continue
+            
+            # Filter out invalid payloads
+            data = entry.get('action_data', {})
+            if data.get('invalid'):
+                continue
+                
+            processed_users.add(u_id)
+            valid_actions.append(entry)
+            
+        return valid_actions
+
+    @staticmethod
+    def execute_advancement(session):
+        lock = session.vars.get('system_lock')
+        if not lock:
+            return []
+
+        with lock:
+            if session.vars.get('is_advancing', False):
+                return [] # Already advancing
+
+            # LOCK THE STATE
+            session.vars['is_advancing'] = True
+            
+            raw_buffer = session.vars.get('action_buffer', [])
+            valid_actions = ActionStateManager.filter_valid_actions(raw_buffer)
+            
+            # UNLOCK & FLUSH
+            session.vars['action_buffer'] = []
+            session.vars['is_advancing'] = False
+            
+            return valid_actions
+
 class Subsession(BaseSubsession):
     pass
 
 def creating_session(subsession: Subsession):
-    pass
+    # Initialize the global locks and buffers for the session
+    if 'system_lock' not in subsession.session.vars:
+        subsession.session.vars['system_lock'] = threading.Lock()
+    if 'action_buffer' not in subsession.session.vars:
+        subsession.session.vars['action_buffer'] = []
+    if 'is_advancing' not in subsession.session.vars:
+        subsession.session.vars['is_advancing'] = False
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
@@ -177,31 +252,33 @@ class ArrivalGatekeeper(Page):
 
         player.category = cat
 
-        all_players = player.subsession.get_players()
-        
-        assigned_nodes = [
-            p.field_maybe_none('node_id') 
-            for p in all_players 
-            if p.field_maybe_none('node_id') is not None
-        ]
-        
-        target_nodes = list(range(1, 11)) if cat == 'High_Concern' else list(range(11, 21))
-        available_nodes = [n for n in target_nodes if n not in assigned_nodes]
+        # --- APPLIED THREAD LOCK TO PREVENT SIMULTANEOUS CLICK RACE CONDITIONS ---
+        lock = player.session.vars.get('system_lock')
+        if lock:
+            with lock:
+                all_players = player.subsession.get_players()
+                assigned_nodes = [
+                    p.field_maybe_none('node_id') 
+                    for p in all_players 
+                    if p.field_maybe_none('node_id') is not None
+                ]
+                
+                target_nodes = list(range(1, 11)) if cat == 'High_Concern' else list(range(11, 21))
+                available_nodes = [n for n in target_nodes if n not in assigned_nodes]
 
-        if available_nodes:
-            assigned_node = min(available_nodes)
-            player.node_id = assigned_node
-            player.participant.node_id = assigned_node
-            player.screened_out = False
-            player.participant.vars['screened_out'] = False # Permanent memory
-        else:
-            player.screened_out = True
-            player.participant.vars['screened_out'] = True # Permanent memory
+                if available_nodes:
+                    assigned_node = min(available_nodes)
+                    player.node_id = assigned_node
+                    player.participant.node_id = assigned_node
+                    player.screened_out = False
+                    player.participant.vars['screened_out'] = False 
+                else:
+                    player.screened_out = True
+                    player.participant.vars['screened_out'] = True 
 
 class CapacityScreenout(Page):
     @staticmethod
     def is_displayed(player: Player):
-        # Uses permanent memory
         return player.round_number == 1 and player.participant.vars.get('screened_out', False)
 
     @staticmethod
