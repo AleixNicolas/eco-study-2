@@ -20,7 +20,16 @@
         <strong>Action Required:</strong><br>
         You may now safely close this tab. Please return to this exact link via Prolific on the specified date.
     </div>
-    
-    <style>.otree-btn-next { display: none !important; }</style>
 </div>
+
+<style>
+    /* Hides the native oTree timer bar triggered by get_timeout_seconds */
+    .otree-timer {
+        display: none !important;
+    }
+    /* Hides the default Next button so participants can't skip ahead */
+    .otree-btn-next { 
+        display: none !important; 
+    }
+</style>
 {{ endblock }}

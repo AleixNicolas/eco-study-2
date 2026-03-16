@@ -215,6 +215,11 @@ class NetworkWait(Page):
             'start_date': player.session.config.get('start_date', 'the specified date')
         }
 
+    @staticmethod
+    def get_timeout_seconds(player: Player):
+        # 30 days in seconds. Forces the "Advance slowest" button to appear in your Admin tab.
+        return 86400 * 30
+
 class FeedTaskGatekeeper(Page):
     @staticmethod
     def is_displayed(player: Player):
@@ -354,6 +359,18 @@ class EndOfDayWait(Page):
     @staticmethod
     def is_displayed(player: Player):
         return player.round_number < Constants.num_rounds and player.field_maybe_none('screened_out') != True
+
+    @staticmethod
+    def get_timeout_seconds(player: Player):
+        now = datetime.now(timezone.utc)
+        release_hour = player.session.config.get('daily_start_hour_utc', 14)
+        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
+        
+        if target <= now:
+            target += timedelta(days=1)
+            
+        # Tells oTree exactly how many seconds until the next round starts
+        return (target - now).total_seconds()
 
     @staticmethod
     def vars_for_template(player: Player):
