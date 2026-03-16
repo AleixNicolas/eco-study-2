@@ -1,24 +1,26 @@
 {{ block title }}Welcome to the Network{{ endblock }}
+
 {{ block content }}
 <div class="card shadow-sm p-4 text-center mt-5">
     <h4 class="mb-4 text-primary">Network Assignment Successful!</h4>
     
     {% if network_full %}
-        <p class="lead text-success">The network is fully formed and the experiment is currently active.</p>
-        <p>Click below to generate your Day 1 News Feed.</p>
-        <div class="mt-4">
-            <button class="btn btn-primary btn-lg otree-btn-next">Start Round 1</button>
+        <div class="alert alert-success">
+            <p class="lead mb-0">The network is now fully formed (20/20 nodes).</p>
         </div>
     {% else %}
         <p class="lead">You have successfully secured your position in the network.</p>
-        <p>The first round will officially begin on <strong>{{ start_date }}</strong>.</p>
-        
-        <div class="alert alert-info mt-4">
-            <strong>Action Required:</strong><br>
-            You may now safely close this tab. Please return to this exact link via Prolific on the specified date to begin the daily tasks. 
-        </div>
-        
-        <style>.otree-btn-next { display: none !important; }</style>
+        <p class="text-muted">We are currently waiting for the remaining participants to claim their nodes.</p>
     {% endif %}
+
+    <h5 class="mt-4">Round 1 officially begins on:</h5>
+    <h3 class="text-info font-weight-bold my-3">{{ start_date }}</h3>
+    
+    <div class="alert alert-info mt-4">
+        <strong>Action Required:</strong><br>
+        You may now safely close this tab. Please return to this exact link via Prolific on the specified date.
+    </div>
+    
+    <style>.otree-btn-next { display: none !important; }</style>
 </div>
 {{ endblock }}
