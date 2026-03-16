@@ -7,29 +7,24 @@
     {% if network_full %}
         <div class="alert alert-success">
             <p class="lead mb-0">The network is now fully formed (20/20 nodes).</p>
+            <p class="mt-2 text-muted">You will be redirected momentarily...</p>
         </div>
     {% else %}
         <p class="lead">You have successfully secured your position in the network.</p>
         <p class="text-muted">We are currently waiting for the remaining participants to claim their nodes.</p>
+        <h5 class="mt-4">Round 1 officially begins on:</h5>
+        <h3 class="text-info font-weight-bold my-3">{{ start_date }}</h3>
+        
+        <div class="alert alert-info mt-4">
+            <strong>Action Required:</strong><br>
+            You may now safely close this tab. Please return to this exact link via Prolific on the specified date.
+        </div>
     {% endif %}
-
-    <h5 class="mt-4">Round 1 officially begins on:</h5>
-    <h3 class="text-info font-weight-bold my-3">{{ start_date }}</h3>
-    
-    <div class="alert alert-info mt-4">
-        <strong>Action Required:</strong><br>
-        You may now safely close this tab. Please return to this exact link via Prolific on the specified date.
-    </div>
 </div>
 
 <style>
-    /* Hides the native oTree timer bar triggered by get_timeout_seconds */
-    .otree-timer {
-        display: none !important;
-    }
-    /* Hides the default Next button so participants can't skip ahead */
-    .otree-btn-next { 
-        display: none !important; 
-    }
+    /* Absolute lockdown of oTree's native timer and buttons */
+    .otree-timer { display: none !important; }
+    .otree-btn-next { display: none !important; }
 </style>
 {{ endblock }}

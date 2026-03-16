@@ -217,8 +217,10 @@ class NetworkWait(Page):
 
     @staticmethod
     def get_timeout_seconds(player: Player):
-        # 30 days in seconds. Forces the "Advance slowest" button to appear in your Admin tab.
-        return 86400 * 30
+        all_players = player.subsession.get_players()
+        assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
+        # If network is fully formed, advance instantly (1 sec). Otherwise, wait (30 days) allowing admin override.
+        return 1 if assigned_count >= 20 else 86400 * 30
 
 class FeedTaskGatekeeper(Page):
     @staticmethod
@@ -369,7 +371,6 @@ class EndOfDayWait(Page):
         if target <= now:
             target += timedelta(days=1)
             
-        # Tells oTree exactly how many seconds until the next round starts
         return (target - now).total_seconds()
 
     @staticmethod
