@@ -192,24 +192,26 @@ class ArrivalGatekeeper(Page):
             assigned_node = min(available_nodes)
             player.node_id = assigned_node
             player.participant.node_id = assigned_node
+            player.screened_out = False
+            player.participant.vars['screened_out'] = False # Permanent memory
         else:
             player.screened_out = True
+            player.participant.vars['screened_out'] = True # Permanent memory
 
 class CapacityScreenout(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number == 1 and player.field_maybe_none('screened_out') == True
+        # Uses permanent memory
+        return player.round_number == 1 and player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def get_timeout_seconds(player: Player):
-        # Automatically pushes rejected participants off this page after 10 seconds.
-        # This zips them to the "Finished" state so they never block the Admin button.
         return 10
 
 class NetworkWait(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number == 1 and player.field_maybe_none('screened_out') != True
+        return player.round_number == 1 and not player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def vars_for_template(player: Player):
@@ -225,13 +227,12 @@ class NetworkWait(Page):
     def get_timeout_seconds(player: Player):
         all_players = player.subsession.get_players()
         assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
-        # If network is fully formed, advance instantly. Otherwise, wait (30 days) allowing admin override.
         return 1 if assigned_count >= 20 else 86400 * 30
 
 class FeedTaskGatekeeper(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.field_maybe_none('screened_out') != True
+        return not player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def vars_for_template(player: Player):
@@ -314,7 +315,7 @@ class FeedTask(Page):
     
     @staticmethod
     def is_displayed(player: Player):
-        return player.field_maybe_none('screened_out') != True
+        return not player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def vars_for_template(player: Player):
@@ -346,9 +347,10 @@ class FeedTask(Page):
 class FinalOpinions(Page):
     form_model = 'player'
     form_fields = ['opinion_1', 'opinion_2', 'opinion_3', 'opinion_4']
+    
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number == Constants.num_rounds and player.field_maybe_none('screened_out') != True
+        return player.round_number == Constants.num_rounds and not player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def vars_for_template(player: Player):
@@ -359,14 +361,15 @@ class FinalOpinions(Page):
 class FinalFeedback(Page):
     form_model = 'player'
     form_fields = ['satisfaction', 'clarity', 'echo_chamber', 'neighbor_similarity', 'final_comments']
+    
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number == Constants.num_rounds and player.field_maybe_none('screened_out') != True
+        return player.round_number == Constants.num_rounds and not player.participant.vars.get('screened_out', False)
 
 class EndOfDayWait(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number < Constants.num_rounds and player.field_maybe_none('screened_out') != True
+        return player.round_number < Constants.num_rounds and not player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def get_timeout_seconds(player: Player):
@@ -395,7 +398,7 @@ class EndOfDayWait(Page):
 class CompletionRedirect(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number == Constants.num_rounds and player.field_maybe_none('screened_out') != True
+        return player.round_number == Constants.num_rounds and not player.participant.vars.get('screened_out', False)
 
     @staticmethod
     def vars_for_template(player: Player):
