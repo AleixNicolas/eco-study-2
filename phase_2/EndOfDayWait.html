@@ -3,8 +3,50 @@
 <div class="card shadow-sm p-4 text-center mt-5">
     <h4 class="mb-4 text-primary">Round {{ player.round_number }} Complete</h4>
     <p>Thank you for participating today. Your decisions have been recorded.</p>
-    <p><strong>You may now safely close this tab.</strong></p>
-    <p>You will receive a Prolific message tomorrow when the network updates and the next round is available.</p>
+    <hr class="my-4">
+    <h5 class="text-muted">The next round begins in your local time on:</h5>
+    <h3 id="local-time-display" class="text-info font-weight-bold my-3">Calculating...</h3>
+    
+    <div class="alert alert-light border mt-4">
+        <h5 class="mb-2">Time Remaining:</h5>
+        <h2 id="countdown-display" style="font-family: monospace;">--:--:--</h2>
+    </div>
+
+    <p class="text-muted mt-4">You may safely close this tab. You will receive a Prolific message when the next round opens, or you can return to this link.</p>
+
+    <div id="next-round-container" class="mt-4" style="display: none;">
+        <button class="btn btn-success btn-lg otree-btn-next">Start Next Round</button>
+    </div>
 </div>
-<style>.otree-btn-next { display: none !important; }</style>
+
+<style>
+    .otree-btn-next { display: none; }
+</style>
+
+<script>
+    const targetDate = new Date("{{ next_round_timestamp }}");
+    const options = { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' };
+    document.getElementById("local-time-display").innerText = targetDate.toLocaleString(undefined, options);
+
+    const timer = setInterval(function() {
+        const now = new Date().getTime();
+        const distance = targetDate.getTime() - now;
+
+        if (distance < 0) {
+            clearInterval(timer);
+            document.getElementById("countdown-display").innerText = "Round is now open!";
+            document.getElementById("next-round-container").style.display = "block";
+            document.querySelector('.otree-btn-next').style.display = 'inline-block';
+        } else {
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            const h = String(hours).padStart(2, '0');
+            const m = String(minutes).padStart(2, '0');
+            const s = String(seconds).padStart(2, '0');
+            document.getElementById("countdown-display").innerText = h + "h " + m + "m " + s + "s";
+        }
+    }, 1000);
+</script>
 {{ endblock }}

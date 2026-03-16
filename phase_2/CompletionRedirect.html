@@ -1,5 +1,4 @@
 {{ block title }}Experiment Complete{{ endblock }}
-
 {{ block content }}
 <div class="card shadow-lg border-0 mt-4 mb-5">
     <div class="card-header bg-success text-white text-center py-4">
@@ -40,26 +39,21 @@
         {% if lottery_eligible %}
         <div class="alert alert-warning text-center border-warning mt-4 shadow-sm">
             <h5 class="alert-heading mb-2">🎟️ $100 Lottery Entry Confirmed! 🎟️</h5>
-            <p class="mb-0 small">Because you maintained perfect attendance across all 7 rounds, your Prolific ID has been automatically entered into the grand prize draw. Winners will be notified via Prolific messaging within 14 days.</p>
+            <p class="mb-0 small">Because you maintained perfect attendance across all 7 rounds, your Prolific ID has been automatically entered into the grand prize draw.</p>
         </div>
         {% else %}
         <div class="alert alert-secondary text-center mt-4">
             <h6 class="mb-1 text-muted">Lottery Entry Status</h6>
-            <p class="mb-0 small text-muted">Requirement: 7/7 Rounds | Status: Not Met.<br>Thank you for your participation in the daily tasks.</p>
+            <p class="mb-0 small text-muted">Requirement: 7/7 Rounds | Status: Not Met.</p>
         </div>
         {% endif %}
 
         <div class="text-center mt-5">
-            <p class="text-muted mb-3">Click the button below to return to Prolific and officially register your completion.</p>
             <a href="{{ completion_url }}" class="btn btn-primary btn-lg px-5 py-3 shadow">
                 Return to Prolific & Complete Study
             </a>
         </div>
     </div>
 </div>
-
-<style>
-    /* Hide the default oTree "Next" button so they are forced to use the Prolific link */
-    .otree-btn-next { display: none !important; }
-</style>
+<style>.otree-btn-next { display: none !important; }</style>
 {{ endblock }}

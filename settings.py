@@ -1,16 +1,22 @@
 from os import environ
 
 # --- REQUIRED SECURITY SETTINGS ---
-# This looks for OTREE_SECRET_KEY in your Heroku Config Vars
-SECRET_KEY = environ.get('OTREE_SECRET_KEY')
+SECRET_KEY = environ.get('OTREE_SECRET_KEY', '2003881942849')
 
 SESSION_CONFIGS = [
+    dict(
+        name='phase_1_intake',
+        app_sequence=['phase_1'],
+        num_demo_participants=3,
+    ),
     dict(
         name='phase2_main_network',
         display_name="Phase 2: 7-Day Network Experiment",
         app_sequence=['phase_2'],
         num_demo_participants=20,
         completion_url='https://app.prolific.com/submissions/complete?cc=YOUR_FINAL_CODE',
+        start_date="Monday, October 16th", 
+        daily_start_hour_utc=14, # 14:00 UTC
     ),
 ]
 
@@ -34,6 +40,7 @@ PARTICIPANT_FIELDS = [
 SESSION_FIELDS = []
 
 ROOMS = [
+    dict(name='testing_room', display_name='Automated Testing Room'),
     dict(name='main_network_room', display_name='Main 20-Node Network Room'),
 ]
 
@@ -45,6 +52,5 @@ USE_POINTS = True
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = environ.get('OTREE_ADMIN_PASSWORD', 'password')
 
-# --- OTREE SETUP ---
 DEMO_PAGE_INTRO_HTML = """ """
 DEBUG = environ.get('OTREE_PRODUCTION') is None

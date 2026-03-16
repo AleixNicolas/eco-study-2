@@ -3,6 +3,7 @@ import random
 import json
 import os
 import csv
+from datetime import datetime, timedelta, timezone
 
 doc = """
 Phase 2: 7-Day Asynchronous Network Experiment with Gamified Rewards.
@@ -18,7 +19,6 @@ class Constants(BaseConstants):
     BONUS_AMOUNT = 5.00
     MAX_ALLOWED_MISSES = 1
     
-    # Load Network Topology
     json_path = os.path.join(os.path.dirname(__file__), 'network_map.json')
     if os.path.exists(json_path):
         with open(json_path, encoding='utf-8') as f:
@@ -27,7 +27,6 @@ class Constants(BaseConstants):
     else:
         NETWORK = {}
 
-    # Load News Items
     csv_path = os.path.join(os.path.dirname(__file__), 'news_items.csv')
     if os.path.exists(csv_path):
         with open(csv_path, encoding='utf-8') as f:
@@ -35,8 +34,6 @@ class Constants(BaseConstants):
     else:
         NEWS_ITEMS = []
 
-    # --- SECURE MAPPING LOAD ---
-    # Loads directly from Heroku's encrypted environment variables
     mapping_data = os.environ.get('PARTICIPANT_MAPPING')
     if mapping_data:
         try:
@@ -58,7 +55,7 @@ class Subsession(BaseSubsession):
     pass
 
 def creating_session(subsession: Subsession):
-    pass # Assignment happens dynamically upon arrival in ArrivalGatekeeper
+    pass
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
@@ -156,20 +153,16 @@ class Player(BasePlayer):
     neighbor_similarity = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="How similar do you think your network neighbors' opinions were to your own?", widget=widgets.RadioSelectHorizontal, blank=True)
     final_comments = models.LongStringField(label="Comments or questions regarding the experiment.", blank=True)
 
-# --- PAGES ---
-
 class ArrivalGatekeeper(Page):
     @staticmethod
     def is_displayed(player: Player):
         return player.round_number == 1
 
     @staticmethod
-
     def before_next_page(player: Player, timeout_happened):
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
         player.participant.prolific_id = p_label
         
-        # Pull baseline data from mapping
         if p_label in Constants.MAPPING:
             data = Constants.MAPPING[p_label]
             cat = data.get('category')
@@ -184,10 +177,8 @@ class ArrivalGatekeeper(Page):
 
         player.category = cat
 
-        # DYNAMIC POOL ASSIGNMENT
         all_players = player.subsession.get_players()
         
-        # FIX: Use field_maybe_none() to prevent the TypeError crash
         assigned_nodes = [
             p.field_maybe_none('node_id') 
             for p in all_players 
@@ -209,6 +200,21 @@ class CapacityScreenout(Page):
     def is_displayed(player: Player):
         return player.round_number == 1 and player.field_maybe_none('screened_out') == True
 
+class NetworkWait(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == 1 and player.field_maybe_none('screened_out') != True
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        all_players = player.subsession.get_players()
+        assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
+        
+        return {
+            'network_full': assigned_count >= 20,
+            'start_date': player.session.config.get('start_date', 'the specified date')
+        }
+
 class FeedTaskGatekeeper(Page):
     @staticmethod
     def is_displayed(player: Player):
@@ -216,7 +222,6 @@ class FeedTaskGatekeeper(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        # Ensure node_id is synced across rounds
         player.node_id = getattr(player.participant, 'node_id', None)
         player.category = getattr(player.participant, 'assigned_category', None)
 
@@ -226,20 +231,19 @@ class FeedTaskGatekeeper(Page):
         current_round = player.round_number
         backlog = player.participant.vars['backlog']
         
-        # --- ROUND 1: LOAD DIRECTLY FROM MAPPING ---
         if current_round == 1:
+            all_players_r1 = player.subsession.get_players()
             neighbors = Constants.NETWORK.get(player.node_id, [])
             
             for n_id in neighbors:
-                # Find the mapping data for the person assigned to this neighbor node
-                for p_label, p_data in Constants.MAPPING.items():
-                    if p_data.get('node_id') == n_id:
-                        n_shares = p_data.get('outgoing_shares', [])
-                        for item_id in n_shares:
-                            backlog[item_id] = backlog.get(item_id, 0) + 1
-                        break # Stop searching once we find the matching neighbor
+                n_player = next((p for p in all_players_r1 if p.field_maybe_none('node_id') == n_id), None)
+                if n_player and n_player.participant.label:
+                    n_label = n_player.participant.label
+                    n_data = Constants.MAPPING.get(n_label, {})
+                    n_shares = n_data.get('outgoing_shares', [])
+                    for item_id in n_shares:
+                        backlog[item_id] = backlog.get(item_id, 0) + 1
 
-        # --- ROUND 2+: LOAD FROM PREVIOUS ROUND ---
         if current_round > 1:
             prev_subsession = player.subsession.in_round(current_round - 1)
             neighbors = Constants.NETWORK.get(player.node_id, [])
@@ -351,6 +355,19 @@ class EndOfDayWait(Page):
     def is_displayed(player: Player):
         return player.round_number < Constants.num_rounds and player.field_maybe_none('screened_out') != True
 
+    @staticmethod
+    def vars_for_template(player: Player):
+        now = datetime.now(timezone.utc)
+        release_hour = player.session.config.get('daily_start_hour_utc', 14)
+        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
+        
+        if target <= now:
+            target += timedelta(days=1)
+            
+        return {
+            'next_round_timestamp': target.isoformat()
+        }
+
 class CompletionRedirect(Page):
     @staticmethod
     def is_displayed(player: Player):
@@ -382,6 +399,7 @@ class CompletionRedirect(Page):
 page_sequence = [
     ArrivalGatekeeper, 
     CapacityScreenout, 
+    NetworkWait,
     FeedTaskGatekeeper, 
     FeedTask, 
     FinalOpinions, 

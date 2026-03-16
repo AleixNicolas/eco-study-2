@@ -2,6 +2,17 @@
 {{ block content }}
 
 <style>
+    .likert-mobile-fix .controls,
+    .likert-mobile-fix .form-check-inline {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        margin-right: 15px;
+    }
+    .likert-mobile-fix label {
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
     .mobile-article-body {
         display: none;
         background-color: #fff;
@@ -16,7 +27,7 @@
     <div class="d-flex align-items-center" style="gap: 15px;">
         <div class="text-center">
             {% if shield_active %}
-                <span style="font-size: 1.5rem;" title="Shield Intact: You can miss one round without penalty.">🛡️</span>
+                <span style="font-size: 1.5rem;" title="Shield Intact">🛡️</span>
                 <div style="font-size: 0.7rem;" class="text-success">Shield Active</div>
             {% else %}
                 <span style="font-size: 1.5rem; opacity: 0.3;" title="Shield Broken">🛡️</span>
@@ -43,7 +54,6 @@
 <input type="hidden" name="total_time_on_feed" id="total_time_on_feed">
 
 <div class="row">
-    
     <div class="col-md-6 order-1 order-md-2 mb-3 d-none d-md-block">
         <div id="reading-pane" class="card shadow-sm p-4 sticky-top" style="top: 10px; min-height: 250px; max-height: 45vh; overflow-y: auto;">
             <h5 id="display-headline" class="text-muted">Select an article from the list below.</h5>
@@ -53,8 +63,7 @@
 
     <div class="col-md-6 order-2 order-md-1" style="max-height: 80vh; overflow-y: auto; padding-bottom: 20px;">
         <p class="text-muted d-block d-md-none">Review the news articles below. Tap "Read Story" to expand.</p>
-        <p class="text-muted d-none d-md-block">Review the news articles below. Read the story before sharing.</p>
-        
+        <p class="text-muted d-none d-md-block">Review the news articles below. Read the story before deciding.</p>
         <div id="feed-container"></div>
     </div>
 </div>
@@ -77,18 +86,21 @@
             let card = document.createElement('div');
             card.className = "card bg-light mb-2 p-3 news-item";
             
-            // Generate the responsive HTML
             card.innerHTML = `
                 <h6 style="color: #333;">${item.headline}</h6>
-                
                 <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-3 mt-2 text-muted d-md-none" style="font-size: 0.9rem;">
                     ${item.additional_text}
                 </div>
-
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-2">
-                    <div class="form-check mb-2 mb-md-0">
-                        <input class="form-check-input share-checkbox" type="checkbox" value="${item.id}" id="check_${index}">
-                        <label class="form-check-label" for="check_${index}">Share with my network</label>
+                    <div class="likert-mobile-fix w-100 mb-2 mb-md-0">
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="${item.id}" id="share_${index}">
+                            <label class="form-check-label" for="share_${index}">Share</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="Not Share" id="not_share_${index}">
+                            <label class="form-check-label" for="not_share_${index}">Not Share</label>
+                        </div>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary ms-md-2 flex-shrink-0" onclick="showArticle(${index})">
                         Read Story
@@ -101,16 +113,11 @@
 
     function showArticle(index) {
         let item = feedData[index];
-        
-        // Desktop Behavior
         if (window.innerWidth >= 768) {
             document.getElementById('display-headline').innerText = item.headline;
             document.getElementById('display-body').innerText = item.additional_text;
-        } 
-        // Mobile Accordion Behavior
-        else {
+        } else {
             let mobileContent = document.getElementById('mobile_body_' + index);
-            
             if (mobileContent.style.display === 'block') {
                 mobileContent.style.display = 'none';
             } else {
@@ -121,15 +128,32 @@
     }
 
     setInterval(() => {
-        let unchecked = document.querySelectorAll('.share-checkbox:not(:checked)').length;
-        backlogChecks.push(unchecked);
+        let count = 0;
+        for (let i = 0; i < feedSize; i++) {
+            if (!document.querySelector(`input[name="decision_${i}"]:checked`)) count++;
+        }
+        backlogChecks.push(count);
     }, 500);
 
     function submitFeed() {
         let shares = [];
-        document.querySelectorAll('.share-checkbox:checked').forEach(cb => shares.push(cb.value));
+        let missingDecision = false;
+
+        for (let i = 0; i < feedSize; i++) {
+            let selected = document.querySelector(`input[name="decision_${i}"]:checked`);
+            if (!selected) {
+                missingDecision = true;
+            } else if (selected.value !== "Not Share") {
+                shares.push(selected.value);
+            }
+        }
+
+        if (missingDecision) {
+            alert("Please select 'Share' or 'Not Share' for every article before completing the round.");
+            return;
+        }
+
         document.getElementById('outgoing_shares').value = JSON.stringify(shares);
-        
         document.getElementById('max_feed_size').value = feedSize;
         document.getElementById('average_feed_size').value = feedSize.toFixed(2);
         
