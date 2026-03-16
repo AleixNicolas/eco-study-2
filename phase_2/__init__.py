@@ -200,6 +200,12 @@ class CapacityScreenout(Page):
     def is_displayed(player: Player):
         return player.round_number == 1 and player.field_maybe_none('screened_out') == True
 
+    @staticmethod
+    def get_timeout_seconds(player: Player):
+        # Automatically pushes rejected participants off this page after 10 seconds.
+        # This zips them to the "Finished" state so they never block the Admin button.
+        return 10
+
 class NetworkWait(Page):
     @staticmethod
     def is_displayed(player: Player):
@@ -219,7 +225,7 @@ class NetworkWait(Page):
     def get_timeout_seconds(player: Player):
         all_players = player.subsession.get_players()
         assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
-        # If network is fully formed, advance instantly (1 sec). Otherwise, wait (30 days) allowing admin override.
+        # If network is fully formed, advance instantly. Otherwise, wait (30 days) allowing admin override.
         return 1 if assigned_count >= 20 else 86400 * 30
 
 class FeedTaskGatekeeper(Page):

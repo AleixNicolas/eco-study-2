@@ -10,7 +10,7 @@
         <h2 id="countdown-display" style="font-family: monospace; color: #2c3e50;">--:--:--</h2>
     </div>
 
-    <p class="text-muted mt-4">You may safely close this tab. You will receive a Prolific message when the next round opens, or you can simply return to this link later.</p>
+    <p class="text-muted mt-4">You may safely close this tab. You will receive a Prolific message when the next round opens, or you can return to this link.</p>
 </div>
 
 <style>
@@ -28,7 +28,6 @@
         if (distance <= 0) {
             clearInterval(timer);
             document.getElementById("countdown-display").innerText = "Round is now open! Redirecting...";
-            // If user happens to be looking at the page when time expires, refresh to let the server move them.
             setTimeout(() => location.reload(), 2000); 
         } else {
             const h = Math.floor(distance / 3600000).toString().padStart(2, '0');

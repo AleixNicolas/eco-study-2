@@ -27,4 +27,14 @@
     .otree-timer { display: none !important; }
     .otree-btn-next { display: none !important; }
 </style>
+
+<script>
+    // If the network isn't full yet, check the server every 10 seconds.
+    // This allows auto-progression the moment the 20th person arrives.
+    {% if not network_full %}
+        setTimeout(function() {
+            window.location.reload();
+        }, 10000);
+    {% endif %}
+</script>
 {{ endblock }}
