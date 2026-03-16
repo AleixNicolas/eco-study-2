@@ -226,6 +226,20 @@ class FeedTaskGatekeeper(Page):
         current_round = player.round_number
         backlog = player.participant.vars['backlog']
         
+        # --- ROUND 1: LOAD DIRECTLY FROM MAPPING ---
+        if current_round == 1:
+            neighbors = Constants.NETWORK.get(player.node_id, [])
+            
+            for n_id in neighbors:
+                # Find the mapping data for the person assigned to this neighbor node
+                for p_label, p_data in Constants.MAPPING.items():
+                    if p_data.get('node_id') == n_id:
+                        n_shares = p_data.get('outgoing_shares', [])
+                        for item_id in n_shares:
+                            backlog[item_id] = backlog.get(item_id, 0) + 1
+                        break # Stop searching once we find the matching neighbor
+
+        # --- ROUND 2+: LOAD FROM PREVIOUS ROUND ---
         if current_round > 1:
             prev_subsession = player.subsession.in_round(current_round - 1)
             neighbors = Constants.NETWORK.get(player.node_id, [])
@@ -233,9 +247,12 @@ class FeedTaskGatekeeper(Page):
             for n_id in neighbors:
                 n_player = next((p for p in prev_subsession.get_players() if p.node_id == n_id), None)
                 if n_player and n_player.field_maybe_none('outgoing_shares'):
-                    n_shares = json.loads(n_player.outgoing_shares)
-                    for item_id in n_shares:
-                        backlog[item_id] = backlog.get(item_id, 0) + 1
+                    try:
+                        n_shares = json.loads(n_player.outgoing_shares)
+                        for item_id in n_shares:
+                            backlog[item_id] = backlog.get(item_id, 0) + 1
+                    except json.JSONDecodeError:
+                        pass
 
         feed_item_ids = []
 
