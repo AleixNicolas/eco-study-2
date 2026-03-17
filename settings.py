@@ -12,7 +12,7 @@ SESSION_CONFIGS = [
         num_demo_participants=20,
         completion_url='https://app.prolific.com/submissions/complete?cc=YOUR_FINAL_CODE',
         start_date="Monday, October 16th", 
-        daily_start_hour_utc=14, # 14:00 UTC
+        daily_start_hour_utc=14, # 09:00 UTC
     ),
 ]
 

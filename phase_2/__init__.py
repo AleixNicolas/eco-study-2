@@ -118,7 +118,6 @@ class Subsession(BaseSubsession):
     pass
 
 def creating_session(subsession: Subsession):
-    # Only picklable data types go in session.vars
     if 'action_buffer' not in subsession.session.vars:
         subsession.session.vars['action_buffer'] = []
     if 'is_advancing' not in subsession.session.vars:
@@ -244,7 +243,6 @@ class ArrivalGatekeeper(Page):
 
         player.category = cat
 
-        # Secure node assignment with the global lock
         with SYSTEM_LOCK:
             all_players = player.subsession.get_players()
             assigned_nodes = [
@@ -273,7 +271,7 @@ class CapacityScreenout(Page):
 
     @staticmethod
     def get_timeout_seconds(player: Player):
-        return 10
+        return 10  # Maintained at 10 seconds for real users
 
 class NetworkWait(Page):
     @staticmethod
