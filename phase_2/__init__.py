@@ -14,7 +14,6 @@ Contains Thread-Safe Action Buffer for concurrent user advancement.
 
 # ==========================================
 # Module-Level Memory Lock 
-# (Cannot be stored in session.vars)
 # ==========================================
 SYSTEM_LOCK = threading.Lock()
 
@@ -226,6 +225,12 @@ class ArrivalGatekeeper(Page):
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
+        if timeout_happened:
+            player.screened_out = True
+            player.participant.vars['screened_out'] = True
+            player.participant.vars['is_ghost'] = True
+            return
+
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
         player.participant.prolific_id = p_label
         
@@ -267,11 +272,13 @@ class ArrivalGatekeeper(Page):
 class CapacityScreenout(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number == 1 and player.participant.vars.get('screened_out', False)
+        is_screened = player.participant.vars.get('screened_out', False)
+        is_ghost = player.participant.vars.get('is_ghost', False)
+        return player.round_number == 1 and is_screened and not is_ghost
 
     @staticmethod
     def get_timeout_seconds(player: Player):
-        return 10  # Maintained at 10 seconds for real users
+        return 10  
 
 class NetworkWait(Page):
     @staticmethod
@@ -301,75 +308,89 @@ class FeedTaskGatekeeper(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        player.node_id = getattr(player.participant, 'node_id', None)
-        player.category = getattr(player.participant, 'assigned_category', None)
+        try:
+            player.node_id = getattr(player.participant, 'node_id', None)
+            player.category = getattr(player.participant, 'assigned_category', None)
 
-        if 'backlog' not in player.participant.vars:
-            player.participant.vars['backlog'] = {}
+            if 'backlog' not in player.participant.vars:
+                player.participant.vars['backlog'] = {}
 
-        current_round = player.round_number
-        backlog = player.participant.vars['backlog']
-        
-        if current_round == 1:
-            all_players_r1 = player.subsession.get_players()
-            neighbors = Constants.NETWORK.get(player.node_id, [])
+            current_round = player.round_number
+            backlog = player.participant.vars['backlog']
             
-            for n_id in neighbors:
-                n_player = next((p for p in all_players_r1 if p.field_maybe_none('node_id') == n_id), None)
-                if n_player and n_player.participant.label:
-                    n_label = n_player.participant.label
-                    n_data = Constants.MAPPING.get(n_label, {})
-                    n_shares = n_data.get('outgoing_shares', [])
-                    for item_id in n_shares:
-                        backlog[item_id] = backlog.get(item_id, 0) + 1
-
-        if current_round > 1:
-            prev_subsession = player.subsession.in_round(current_round - 1)
-            neighbors = Constants.NETWORK.get(player.node_id, [])
-            
-            for n_id in neighbors:
-                n_player = next((p for p in prev_subsession.get_players() if p.node_id == n_id), None)
-                if n_player and n_player.field_maybe_none('outgoing_shares'):
-                    try:
-                        n_shares = json.loads(n_player.outgoing_shares)
+            if current_round == 1:
+                all_players_r1 = player.subsession.get_players()
+                neighbors = Constants.NETWORK.get(player.node_id, [])
+                
+                for n_id in neighbors:
+                    n_player = next((p for p in all_players_r1 if p.field_maybe_none('node_id') == n_id), None)
+                    if n_player and n_player.participant.label:
+                        n_label = n_player.participant.label
+                        n_data = Constants.MAPPING.get(n_label, {})
+                        n_shares = n_data.get('outgoing_shares', [])
                         for item_id in n_shares:
                             backlog[item_id] = backlog.get(item_id, 0) + 1
-                    except json.JSONDecodeError:
-                        pass
 
-        feed_item_ids = []
-
-        if len(backlog) > 4:
-            pool = list(backlog.keys())
-            weights = [backlog[k] for k in pool]
-            while len(feed_item_ids) < 4 and pool:
-                choice = random.choices(pool, weights=weights, k=1)[0]
-                feed_item_ids.append(choice)
-                idx = pool.index(choice)
-                pool.pop(idx)
-                weights.pop(idx)
-        else:
-            feed_item_ids = list(backlog.keys())
-
-        if len(feed_item_ids) < 4:
-            needed = 4 - len(feed_item_ids)
-            all_ids = [item['id'] for item in Constants.NEWS_ITEMS]
-            available_pool = [i for i in all_ids if i not in feed_item_ids]
-            padding_items = random.sample(available_pool, needed)
-            feed_item_ids.extend(padding_items)
-
-        for item_id in feed_item_ids:
-            if item_id in backlog:
-                del backlog[item_id]
-
-        feed_items = []
-        for item_id in feed_item_ids:
-            item_data = next((item for item in Constants.NEWS_ITEMS if item['id'] == item_id), None)
-            if item_data:
-                feed_items.append(item_data)
+            if current_round > 1:
+                prev_subsession = player.subsession.in_round(current_round - 1)
+                neighbors = Constants.NETWORK.get(player.node_id, [])
                 
-        player.incoming_feed = json.dumps(feed_items)
-        return {}
+                prev_players = prev_subsession.get_players()
+                for n_id in neighbors:
+                    n_player = next((p for p in prev_players if p.field_maybe_none('node_id') == n_id), None)
+                    if n_player and n_player.field_maybe_none('outgoing_shares'):
+                        try:
+                            n_shares = json.loads(n_player.outgoing_shares)
+                            if isinstance(n_shares, list):
+                                for item_id in n_shares:
+                                    item_id = str(item_id) 
+                                    backlog[item_id] = backlog.get(item_id, 0) + 1
+                        except Exception:
+                            pass
+
+            feed_item_ids = []
+
+            if len(backlog) > 4:
+                pool = list(backlog.keys())
+                weights = [backlog[k] for k in pool]
+                while len(feed_item_ids) < 4 and pool:
+                    choice = random.choices(pool, weights=weights, k=1)[0]
+                    feed_item_ids.append(choice)
+                    idx = pool.index(choice)
+                    pool.pop(idx)
+                    weights.pop(idx)
+            else:
+                feed_item_ids = list(backlog.keys())
+
+            if len(feed_item_ids) < 4:
+                needed = 4 - len(feed_item_ids)
+                all_ids = [str(item.get('id', '')) for item in Constants.NEWS_ITEMS]
+                available_pool = [i for i in all_ids if i not in feed_item_ids and i != '']
+                
+                if needed <= len(available_pool):
+                    padding_items = random.sample(available_pool, needed)
+                else:
+                    padding_items = available_pool
+                
+                feed_item_ids.extend(padding_items)
+
+            for item_id in feed_item_ids:
+                if item_id in backlog:
+                    del backlog[item_id]
+
+            feed_items = []
+            for item_id in feed_item_ids:
+                item_data = next((item for item in Constants.NEWS_ITEMS if str(item.get('id', '')) == str(item_id)), None)
+                if item_data:
+                    feed_items.append(item_data)
+                    
+            player.incoming_feed = json.dumps(feed_items)
+            return {}
+            
+        except Exception as e:
+            print(f"CRITICAL ERROR AVOIDED in Round {player.round_number}: {e}")
+            player.incoming_feed = "[]"
+            return {}
 
 class FeedTask(Page):
     form_model = 'player'
