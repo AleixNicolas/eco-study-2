@@ -1,6 +1,8 @@
 {{ block title }}Daily Task Complete{{ endblock }}
 
 {{ block content }}
+{{ include 'phase_2/StatusHeader.html' }}
+
 <div class="card shadow-sm p-4 text-center mt-5">
     <h4 class="mb-4 text-primary">Day {{ player.round_number }} Complete</h4>
     <p>Your responses have been saved. The next round will unlock automatically at the scheduled time.</p>

@@ -1,0 +1,26 @@
+<div class="alert alert-secondary d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 shadow-sm">
+    <div class="mb-2 mb-md-0 text-center text-md-start">
+        <span class="badge bg-primary me-2" style="font-size: 1.05rem; margin-right: 15px;">Round {{ current_round }} / {{ total_rounds }}</span>
+        <strong>Base Earnings:</strong> <span class="badge bg-success" style="font-size: 1rem;">{{ current_earnings }}</span>
+    </div>
+    <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+        <div class="text-center">
+            {% if shield_active %}
+                <span style="font-size: 1.5rem;" title="Shield Intact">🛡️</span>
+                <div style="font-size: 0.7rem;" class="text-success">Shield Active</div>
+            {% else %}
+                <span style="font-size: 1.5rem; opacity: 0.3;" title="Shield Broken">🛡️</span>
+                <div style="font-size: 0.7rem;" class="text-danger">Shield Broken</div>
+            {% endif %}
+        </div>
+        <div class="text-center">
+            {% if chest_active %}
+                <span style="font-size: 1.5rem;" title="{{ bonus_amount }} Bonus Secured">🧰</span>
+                <div style="font-size: 0.7rem;" class="text-success">{{ bonus_amount }} Secured</div>
+            {% else %}
+                <span style="font-size: 1.5rem; opacity: 0.3;" title="Bonus Lost">🧰</span>
+                <div style="font-size: 0.7rem;" class="text-danger">Bonus Lost</div>
+            {% endif %}
+        </div>
+    </div>
+</div>

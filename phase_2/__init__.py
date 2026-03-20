@@ -165,7 +165,7 @@ def vars_for_admin_report(subsession: Subsession):
             if past_p.field_maybe_none('opinion_1') is not None:
                 for i in range(1, 5):
                     final_val = past_p.field_maybe_none(f'opinion_{i}')
-                    baseline_val = getattr(p.participant, f'baseline_opinion_{i}', None)
+                    baseline_val = p.participant.vars.get(f'baseline_opinion_{i}')
                     
                     if final_val is not None and baseline_val is not None:
                         change = final_val - baseline_val
@@ -208,16 +208,47 @@ class Player(BasePlayer):
     
     participated_this_round = models.BooleanField(initial=False)
     
-    opinion_1 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
-    opinion_2 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
-    opinion_3 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
-    opinion_4 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal, blank=True)
-    satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal, blank=True)
-    clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the daily instructions?", widget=widgets.RadioSelectHorizontal, blank=True)
-    echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="To what extent did you feel you were in an 'echo chamber'?", widget=widgets.RadioSelectHorizontal, blank=True)
-    neighbor_similarity = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="How similar do you think your network neighbors' opinions were to your own?", widget=widgets.RadioSelectHorizontal, blank=True)
+    opinion_1 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
+    opinion_2 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
+    opinion_3 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
+    opinion_4 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
+    
+    satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal)
+    clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the daily instructions?", widget=widgets.RadioSelectHorizontal)
+    echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="To what extent did you feel you were in an 'echo chamber'?", widget=widgets.RadioSelectHorizontal)
+    neighbor_similarity = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="How similar do you think your network neighbors' opinions were to your own?", widget=widgets.RadioSelectHorizontal)
     final_comments = models.LongStringField(label="Comments or questions regarding the experiment.", blank=True)
 
+
+# ==========================================
+# Reusable Header Vars Helper
+# ==========================================
+def get_status_vars(player: Player):
+    # Earnings update immediately based on ALL rounds (including the one just finished)
+    all_rounds = player.in_all_rounds()
+    completed_total = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
+    current_earnings = completed_total * Constants.PAY_PER_ROUND
+    
+    # Shield/Chest calculate based on PREVIOUS rounds, locking in status at the start of the day
+    past_rounds = player.in_previous_rounds()
+    completed_past = sum([1 for p in past_rounds if p.field_maybe_none('participated_this_round') == True])
+    missed_rounds_start = (player.round_number - 1) - completed_past
+    
+    shield_active = missed_rounds_start <= 0
+    chest_active = missed_rounds_start <= Constants.MAX_ALLOWED_MISSES
+    
+    return {
+        'current_round': player.round_number,
+        'total_rounds': Constants.num_rounds,
+        'current_earnings': f"${current_earnings:.2f}",
+        'shield_active': shield_active,
+        'chest_active': chest_active,
+        'bonus_amount': f"${Constants.BONUS_AMOUNT:.2f}"
+    }
+
+# ==========================================
+# Pages
+# ==========================================
 class ArrivalGatekeeper(Page):
     @staticmethod
     def is_displayed(player: Player):
@@ -232,19 +263,19 @@ class ArrivalGatekeeper(Page):
             return
 
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
-        player.participant.prolific_id = p_label
+        player.participant.vars['prolific_id'] = p_label
         
         if p_label in Constants.MAPPING:
             data = Constants.MAPPING[p_label]
             cat = data.get('category')
-            player.participant.assigned_category = cat
-            player.participant.baseline_opinion_1 = data.get('opinion_1')
-            player.participant.baseline_opinion_2 = data.get('opinion_2')
-            player.participant.baseline_opinion_3 = data.get('opinion_3')
-            player.participant.baseline_opinion_4 = data.get('opinion_4')
+            player.participant.vars['assigned_category'] = cat
+            player.participant.vars['baseline_opinion_1'] = data.get('opinion_1')
+            player.participant.vars['baseline_opinion_2'] = data.get('opinion_2')
+            player.participant.vars['baseline_opinion_3'] = data.get('opinion_3')
+            player.participant.vars['baseline_opinion_4'] = data.get('opinion_4')
         else:
             cat = 'High_Concern' if player.id_in_group <= 10 else 'Low_Concern'
-            player.participant.assigned_category = cat
+            player.participant.vars['assigned_category'] = cat
 
         player.category = cat
 
@@ -262,7 +293,7 @@ class ArrivalGatekeeper(Page):
             if available_nodes:
                 assigned_node = min(available_nodes)
                 player.node_id = assigned_node
-                player.participant.node_id = assigned_node
+                player.participant.vars['node_id'] = assigned_node
                 player.screened_out = False
                 player.participant.vars['screened_out'] = False 
             else:
@@ -290,10 +321,12 @@ class NetworkWait(Page):
         all_players = player.subsession.get_players()
         assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
         
-        return {
+        vars_dict = {
             'network_full': assigned_count >= 20,
             'start_date': player.session.config.get('start_date', 'the specified date')
         }
+        vars_dict.update(get_status_vars(player))
+        return vars_dict
 
     @staticmethod
     def get_timeout_seconds(player: Player):
@@ -309,8 +342,8 @@ class FeedTaskGatekeeper(Page):
     @staticmethod
     def vars_for_template(player: Player):
         try:
-            player.node_id = getattr(player.participant, 'node_id', None)
-            player.category = getattr(player.participant, 'assigned_category', None)
+            player.node_id = player.participant.vars.get('node_id')
+            player.category = player.participant.vars.get('assigned_category')
 
             if 'backlog' not in player.participant.vars:
                 player.participant.vars['backlog'] = {}
@@ -329,6 +362,7 @@ class FeedTaskGatekeeper(Page):
                         n_data = Constants.MAPPING.get(n_label, {})
                         n_shares = n_data.get('outgoing_shares', [])
                         for item_id in n_shares:
+                            item_id = str(item_id)
                             backlog[item_id] = backlog.get(item_id, 0) + 1
 
             if current_round > 1:
@@ -385,12 +419,12 @@ class FeedTaskGatekeeper(Page):
                     feed_items.append(item_data)
                     
             player.incoming_feed = json.dumps(feed_items)
-            return {}
+            return get_status_vars(player)
             
         except Exception as e:
             print(f"CRITICAL ERROR AVOIDED in Round {player.round_number}: {e}")
             player.incoming_feed = "[]"
-            return {}
+            return get_status_vars(player)
 
 class FeedTask(Page):
     form_model = 'player'
@@ -405,21 +439,7 @@ class FeedTask(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        past_rounds = player.in_previous_rounds()
-        completed_rounds = sum([1 for p in past_rounds if p.field_maybe_none('participated_this_round') == True])
-        missed_rounds = (player.round_number - 1) - completed_rounds
-        
-        current_earnings = completed_rounds * Constants.PAY_PER_ROUND
-        shield_active = missed_rounds <= 0
-        chest_active = missed_rounds <= Constants.MAX_ALLOWED_MISSES
-        
-        return {
-            'completed_rounds': completed_rounds,
-            'current_earnings': f"${current_earnings:.2f}",
-            'shield_active': shield_active,
-            'chest_active': chest_active,
-            'bonus_amount': f"${Constants.BONUS_AMOUNT:.2f}"
-        }
+        return get_status_vars(player)
 
     @staticmethod
     def js_vars(player: Player):
@@ -442,7 +462,9 @@ class FinalOpinions(Page):
     def vars_for_template(player: Player):
         q_keys = ['opinion_1', 'opinion_2', 'opinion_3', 'opinion_4']
         questions_data = [{'name': f, 'text': Constants.QUESTIONS[f]['text'], 'left': Constants.QUESTIONS[f]['left'], 'right': Constants.QUESTIONS[f]['right']} for f in q_keys]
-        return {'questions_data': questions_data}
+        vars_dict = {'questions_data': questions_data}
+        vars_dict.update(get_status_vars(player))
+        return vars_dict
 
 class FinalFeedback(Page):
     form_model = 'player'
@@ -452,71 +474,11 @@ class FinalFeedback(Page):
     def is_displayed(player: Player):
         return player.round_number == Constants.num_rounds and not player.participant.vars.get('screened_out', False)
 
+    @staticmethod
+    def vars_for_template(player: Player):
+        return get_status_vars(player)
+
 class EndOfDayWait(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round_number < Constants.num_rounds and not player.participant.vars.get('screened_out', False)
-
-    @staticmethod
-    def get_timeout_seconds(player: Player):
-        now = datetime.now(timezone.utc)
-        release_hour = player.session.config.get('daily_start_hour_utc', 14)
-        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
-        
-        if target <= now:
-            target += timedelta(days=1)
-            
-        return (target - now).total_seconds()
-
-    @staticmethod
-    def vars_for_template(player: Player):
-        now = datetime.now(timezone.utc)
-        release_hour = player.session.config.get('daily_start_hour_utc', 14)
-        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
-        
-        if target <= now:
-            target += timedelta(days=1)
-            
-        return {
-            'next_round_timestamp': target.isoformat()
-        }
-
-class CompletionRedirect(Page):
-    @staticmethod
-    def is_displayed(player: Player):
-        return player.round_number == Constants.num_rounds and not player.participant.vars.get('screened_out', False)
-
-    @staticmethod
-    def vars_for_template(player: Player):
-        all_rounds = player.in_all_rounds()
-        completed_rounds = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
-        missed_rounds = Constants.num_rounds - completed_rounds
-        
-        base_pay = completed_rounds * Constants.PAY_PER_ROUND
-        bonus = Constants.BONUS_AMOUNT if missed_rounds <= Constants.MAX_ALLOWED_MISSES else 0.00
-        total_pay = base_pay + bonus
-        
-        lottery_eligible = (missed_rounds == 0)
-        completion_url = player.session.config.get('completion_url', '')
-        
-        return {
-            'completed_rounds': completed_rounds,
-            'base_pay': f"${base_pay:.2f}",
-            'bonus_amount': f"${bonus:.2f}",
-            'total_pay': f"${total_pay:.2f}",
-            'earned_bonus': bonus > 0,
-            'lottery_eligible': lottery_eligible,
-            'completion_url': completion_url
-        }
-
-page_sequence = [
-    ArrivalGatekeeper, 
-    CapacityScreenout, 
-    NetworkWait,
-    FeedTaskGatekeeper, 
-    FeedTask, 
-    FinalOpinions, 
-    FinalFeedback, 
-    EndOfDayWait, 
-    CompletionRedirect
-]
+        return player.round

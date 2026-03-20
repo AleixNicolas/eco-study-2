@@ -2,49 +2,60 @@
 {{ block content }}
 
 <style>
-    .likert-mobile-fix .controls,
-    .likert-mobile-fix .form-check-inline {
-        display: inline-flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        margin-right: 15px;
-    }
-    .likert-mobile-fix label {
-        font-size: 0.85rem;
-        white-space: nowrap;
-    }
-    .mobile-article-body {
-        display: none;
-        background-color: #fff;
-        border-left: 3px solid #0d6efd;
+    /* Compact horizontal layout for the radio buttons */ 
+    .compact-decision .controls { 
+        display: flex !important; 
+        flex-direction: row !important; 
+        flex-wrap: nowrap !important; 
+        justify-content: flex-start; 
+        gap: 15px; 
+    } 
+    .compact-decision .form-check { 
+        margin-bottom: 0 !important; 
+        white-space: nowrap; 
+    } 
+
+    /* Reduce vertical footprint of cards */ 
+    .news-item { 
+        padding: 10px 12px !important; 
+        margin-bottom: 8px !important; 
+        border-radius: 8px; 
+    } 
+
+    .news-item h6 { 
+        font-size: 0.95rem; 
+        margin-bottom: 6px !important; 
+        line-height: 1.2; 
+    } 
+
+    /* Reading pane adjustments for laptop height */ 
+    #reading-pane { 
+        top: 20px; 
+        min-height: 200px; 
+        max-height: 60vh; 
+        overflow-y: auto; 
+    } 
+
+    /* Mobile Accordion */ 
+    .mobile-article-body { 
+        display: none; 
+        background-color: #fff; 
+        border-left: 3px solid #0d6efd; 
+    } 
+    .mobile-article-body.show { 
+        display: block; 
+    } 
+
+    /* Ensure mobile retains flexibility without breaking */
+    @media (max-width: 767px) {
+        .compact-decision .controls {
+            flex-wrap: wrap !important;
+            gap: 5px;
+        }
     }
 </style>
 
-<div class="alert alert-secondary d-flex justify-content-between align-items-center mb-4 shadow-sm">
-    <div>
-        <strong>Base Earnings:</strong> <span class="badge bg-success" style="font-size: 1rem;">{{ current_earnings }}</span>
-    </div>
-    <div class="d-flex align-items-center" style="gap: 15px;">
-        <div class="text-center">
-            {% if shield_active %}
-                <span style="font-size: 1.5rem;" title="Shield Intact">🛡️</span>
-                <div style="font-size: 0.7rem;" class="text-success">Shield Active</div>
-            {% else %}
-                <span style="font-size: 1.5rem; opacity: 0.3;" title="Shield Broken">🛡️</span>
-                <div style="font-size: 0.7rem;" class="text-danger">Shield Broken</div>
-            {% endif %}
-        </div>
-        <div class="text-center">
-            {% if chest_active %}
-                <span style="font-size: 1.5rem;" title="{{ bonus_amount }} Bonus Secured">🧰</span>
-                <div style="font-size: 0.7rem;" class="text-success">{{ bonus_amount }} Secured</div>
-            {% else %}
-                <span style="font-size: 1.5rem; opacity: 0.3;" title="Bonus Lost">🧰</span>
-                <div style="font-size: 0.7rem;" class="text-danger">Bonus Lost</div>
-            {% endif %}
-        </div>
-    </div>
-</div>
+{{ include 'phase_2/StatusHeader.html' }}
 
 <input type="hidden" name="outgoing_shares" id="outgoing_shares">
 <input type="hidden" name="average_feed_size" id="average_feed_size">
@@ -54,22 +65,23 @@
 <input type="hidden" name="total_time_on_feed" id="total_time_on_feed">
 
 <div class="row">
-    <div class="col-md-6 order-1 order-md-2 mb-3 d-none d-md-block">
-        <div id="reading-pane" class="card shadow-sm p-4 sticky-top" style="top: 10px; min-height: 250px; max-height: 45vh; overflow-y: auto;">
-            <h5 id="display-headline" class="text-muted">Select an article from the list below.</h5>
-            <p id="display-body"></p>
-        </div>
+    <div class="col-md-7 order-2 order-md-1" style="max-height: 85vh; overflow-y: auto; padding-right: 15px;">
+        <p class="text-muted small mb-2 d-block d-md-none">Review the news articles below. Tap "Read More" to expand.</p>
+        <p class="text-muted small mb-2 d-none d-md-block">Review the articles. You may read the story before deciding whether to share each article.</p>
+        <div id="feed-container"></div>
     </div>
 
-    <div class="col-md-6 order-2 order-md-1" style="max-height: 80vh; overflow-y: auto; padding-bottom: 20px;">
-        <p class="text-muted d-block d-md-none">Review the news articles below. Tap "Read Story" to expand.</p>
-        <p class="text-muted d-none d-md-block">Review the news articles below. Read the story before deciding.</p>
-        <div id="feed-container"></div>
+    <div class="col-md-5 order-1 order-md-2 mb-3 d-none d-md-block">
+        <div id="reading-pane" class="card shadow-sm p-3 sticky-top">
+            <h5 id="display-headline" class="h6 text-primary">Select an article to read</h5>
+            <hr class="my-2">
+            <p id="display-body" class="small text-muted" style="line-height: 1.4;"></p>
+        </div>
     </div>
 </div>
 
 <div class="text-center mt-4 mb-5">
-    <button type="button" class="btn btn-primary btn-lg" onclick="submitFeed()">Complete Round</button>
+    <button type="button" class="btn btn-success btn-lg" onclick="submitFeed()">Complete Round</button>
 </div>
 
 <script>
@@ -84,26 +96,29 @@
     } else {
         feedData.forEach((item, index) => {
             let card = document.createElement('div');
-            card.className = "card bg-light mb-2 p-3 news-item";
+            card.className = "card bg-light news-item";
             
             card.innerHTML = `
-                <h6 style="color: #333;">${item.headline}</h6>
-                <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-3 mt-2 text-muted d-md-none" style="font-size: 0.9rem;">
+                <h6 class="fw-bold">${item.headline}</h6>
+                <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-2 text-muted d-md-none small">
                     ${item.additional_text}
                 </div>
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-2">
-                    <div class="likert-mobile-fix w-100 mb-2 mb-md-0">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="${item.id}" id="share_${index}">
-                            <label class="form-check-label" for="share_${index}">Share</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="Not Share" id="not_share_${index}">
-                            <label class="form-check-label" for="not_share_${index}">Not Share</label>
+                
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <div class="compact-decision">
+                        <div class="controls">
+                            <div class="form-check">
+                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="${item.id}" id="share_${index}">
+                                <label class="form-check-label" for="share_${index}">Share</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="Not Share" id="not_share_${index}">
+                                <label class="form-check-label" for="not_share_${index}">Not Share</label>
+                            </div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-outline-primary ms-md-2 flex-shrink-0" onclick="showArticle(${index})">
-                        Read Story
+                    <button type="button" class="btn btn-sm btn-primary py-0 text-nowrap" style="height: 30px;" onclick="showArticle(${index})">
+                        Read More
                     </button>
                 </div>
             `;
