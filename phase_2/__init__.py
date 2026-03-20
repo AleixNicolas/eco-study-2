@@ -481,4 +481,72 @@ class FinalFeedback(Page):
 class EndOfDayWait(Page):
     @staticmethod
     def is_displayed(player: Player):
-        return player.round
+        return player.round_number < Constants.num_rounds and not player.participant.vars.get('screened_out', False)
+
+    @staticmethod
+    def get_timeout_seconds(player: Player):
+        now = datetime.now(timezone.utc)
+        release_hour = player.session.config.get('daily_start_hour_utc', 14)
+        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
+        
+        if target <= now:
+            target += timedelta(days=1)
+            
+        return (target - now).total_seconds()
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        now = datetime.now(timezone.utc)
+        release_hour = player.session.config.get('daily_start_hour_utc', 14)
+        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
+        
+        if target <= now:
+            target += timedelta(days=1)
+            
+        vars_dict = {
+            'next_round_timestamp': target.isoformat()
+        }
+        vars_dict.update(get_status_vars(player))
+        return vars_dict
+
+class CompletionRedirect(Page):
+    @staticmethod
+    def is_displayed(player: Player):
+        return player.round_number == Constants.num_rounds and not player.participant.vars.get('screened_out', False)
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        all_rounds = player.in_all_rounds()
+        completed_rounds = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
+        missed_rounds = Constants.num_rounds - completed_rounds
+        
+        base_pay = completed_rounds * Constants.PAY_PER_ROUND
+        bonus = Constants.BONUS_AMOUNT if missed_rounds <= Constants.MAX_ALLOWED_MISSES else 0.00
+        total_pay = base_pay + bonus
+        
+        lottery_eligible = (missed_rounds == 0)
+        completion_url = player.session.config.get('completion_url', '')
+        
+        vars_dict = {
+            'completed_rounds': completed_rounds,
+            'base_pay': f"${base_pay:.2f}",
+            'bonus_amount': f"${bonus:.2f}",
+            'total_pay': f"${total_pay:.2f}",
+            'earned_bonus': bonus > 0,
+            'lottery_eligible': lottery_eligible,
+            'completion_url': completion_url
+        }
+        vars_dict.update(get_status_vars(player))
+        return vars_dict
+
+page_sequence = [
+    ArrivalGatekeeper, 
+    CapacityScreenout, 
+    NetworkWait,
+    FeedTaskGatekeeper, 
+    FeedTask, 
+    FinalOpinions, 
+    FinalFeedback, 
+    EndOfDayWait, 
+    CompletionRedirect
+]
