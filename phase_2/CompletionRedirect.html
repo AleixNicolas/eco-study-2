@@ -17,12 +17,12 @@
                 <strong>{{ base_pay }}</strong>
             </li>
             
-            {% if earned_bonus %}
+            {{ if earned_bonus }}
             <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-success">
                 <span><strong>Completion Bonus Secured</strong> 🧰</span>
-                <strong>+ {{ bonus_amount }}</strong>
+                <strong>+ {{ final_bonus_amount }}</strong>
             </li>
-            {% else %}
+            {{ else }}
             <li class="list-group-item d-flex justify-content-between align-items-center bg-light text-muted" style="font-size: 0.95rem;">
                 <div>
                     <span>Completion Bonus Eligibility</span><br>
@@ -30,7 +30,7 @@
                 </div>
                 <strong>$0.00</strong>
             </li>
-            {% endif %}
+            {{ endif }}
             
             <li class="list-group-item d-flex justify-content-between align-items-center mt-3 border-top border-2">
                 <span class="fs-5"><strong>Total Final Payout</strong></span>
@@ -38,17 +38,17 @@
             </li>
         </ul>
 
-        {% if lottery_eligible %}
+        {{ if lottery_eligible }}
         <div class="alert alert-warning text-center border-warning mt-4 shadow-sm">
             <h5 class="alert-heading mb-2">🎟️ $100 Lottery Entry Confirmed! 🎟️</h5>
             <p class="mb-0 small">Because you maintained perfect attendance across all 7 rounds, your Prolific ID has been automatically entered into the grand prize draw.</p>
         </div>
-        {% else %}
+        {{ else }}
         <div class="alert alert-secondary text-center mt-4">
             <h6 class="mb-1 text-muted">Lottery Entry Status</h6>
             <p class="mb-0 small text-muted">Requirement: 7/7 Rounds | Status: Not Met.</p>
         </div>
-        {% endif %}
+        {{ endif }}
 
         <div class="text-center mt-5">
             <a href="{{ completion_url }}" class="btn btn-primary btn-lg px-5 py-3 shadow">

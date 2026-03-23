@@ -90,15 +90,12 @@ class Player(BasePlayer):
     final_comments = models.LongStringField(label="Comments or questions regarding the experiment.", blank=True)
 
 def get_status_vars(player: Player):
-    # Adjust logic: We only track completed rounds for bonus purposes. 
-    # Round 1 is initialization. Rounds 2-8 are the 7 main days.
     all_rounds = player.in_all_rounds()
     completed_total = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
     
     past_rounds = player.in_previous_rounds()
     completed_past = sum([1 for p in past_rounds if p.field_maybe_none('participated_this_round') == True])
     
-    # Calculate missed rounds out of the total rounds available so far
     rounds_available_past = player.round_number - 1
     missed_rounds_start = rounds_available_past - completed_past
     
@@ -175,7 +172,11 @@ class NetworkWait(Page):
     def vars_for_template(player: Player):
         all_players = player.subsession.get_players()
         assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
-        vars_dict = {'network_full': assigned_count >= 20}
+        
+        vars_dict = {
+            'network_full': assigned_count >= 20,
+            'start_date': player.session.config.get('start_date', 'the specified date')
+        }
         vars_dict.update(get_status_vars(player))
         return vars_dict
 
@@ -201,7 +202,6 @@ class FeedTaskGatekeeper(Page):
         current_round = player.round_number
         backlog = player.participant.vars['backlog']
         
-        # Round 1 has no previous round to pull from. Random items.
         if current_round > 1:
             prev_subsession = player.subsession.in_round(current_round - 1)
             neighbors = Constants.NETWORK.get(player.node_id, [])
@@ -322,13 +322,18 @@ class CompletionRedirect(Page):
         completed_rounds = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
         missed_rounds = Constants.num_rounds - completed_rounds
         
+        base_pay = completed_rounds * Constants.PAY_PER_ROUND
         bonus = Constants.BONUS_AMOUNT if missed_rounds <= Constants.MAX_ALLOWED_MISSES else 0.00
+        total_pay = base_pay + bonus
+        
         lottery_eligible = (missed_rounds == 0)
         completion_url = player.session.config.get('completion_url', '')
         
         vars_dict = {
             'completed_rounds': completed_rounds,
-            'bonus_amount': f"${bonus:.2f}",
+            'base_pay': f"${base_pay:.2f}",
+            'final_bonus_amount': f"${bonus:.2f}",
+            'total_pay': f"${total_pay:.2f}",
             'earned_bonus': bonus > 0,
             'lottery_eligible': lottery_eligible,
             'completion_url': completion_url

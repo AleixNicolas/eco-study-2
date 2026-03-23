@@ -2,7 +2,6 @@
 {{ block content }}
 
 <style>
-    /* Compact horizontal layout for the radio buttons */ 
     .compact-decision .controls { 
         display: flex !important; 
         flex-direction: row !important; 
@@ -19,7 +18,6 @@
         font-size: 0.85rem;
     }
 
-    /* Reduce vertical footprint of cards */ 
     .news-item { 
         padding: 8px 10px !important; 
         margin-bottom: 6px !important; 
@@ -32,7 +30,6 @@
         line-height: 1.2; 
     } 
 
-    /* Reading pane adjustments for laptop height */ 
     #reading-pane { 
         top: 10px; 
         min-height: 350px; 
@@ -40,7 +37,6 @@
         overflow-y: auto; 
     } 
 
-    /* Mobile Accordion */ 
     .mobile-article-body { 
         display: none; 
         background-color: #fff; 
@@ -50,7 +46,6 @@
         display: block; 
     } 
 
-    /* Ensure mobile retains flexibility without breaking */
     @media (max-width: 767px) {
         .compact-decision .controls {
             flex-wrap: wrap !important;

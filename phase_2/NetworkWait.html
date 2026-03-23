@@ -6,12 +6,12 @@
 <div class="card shadow-sm p-4 text-center mt-5">
     <h4 class="mb-4 text-primary">Network Assignment Successful!</h4>
     
-    {% if network_full %}
+    {{ if network_full }}
         <div class="alert alert-success">
             <p class="lead mb-0">The network is now fully formed (20/20 nodes).</p>
             <p class="mt-2 text-muted">You will be redirected momentarily...</p>
         </div>
-    {% else %}
+    {{ else }}
         <p class="lead">You have successfully secured your position in the network.</p>
         <p class="text-muted">We are currently waiting for the remaining participants to claim their nodes.</p>
         <h5 class="mt-4">Round 1 officially begins on:</h5>
@@ -21,22 +21,19 @@
             <strong>Action Required:</strong><br>
             You may now safely close this tab. Please return to this exact link via Prolific on the specified date.
         </div>
-    {% endif %}
+    {{ endif }}
 </div>
 
 <style>
-    /* Absolute lockdown of oTree's native timer and buttons */
     .otree-timer { display: none !important; }
     .otree-btn-next { display: none !important; }
 </style>
 
 <script>
-    // If the network isn't full yet, check the server every 10 seconds.
-    // This allows auto-progression the moment the 20th person arrives.
-    {% if not network_full %}
+    {{ if not network_full }}
         setTimeout(function() {
             window.location.reload();
         }, 10000);
-    {% endif %}
+    {{ endif }}
 </script>
 {{ endblock }}
