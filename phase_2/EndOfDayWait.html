@@ -7,11 +7,19 @@
     <h4 class="mb-4 text-success">Round {{ player.round_number }} Complete</h4>
     <p class="lead">Your responses have been saved and your node is updated.</p>
     
+    <div class="alert alert-light border mt-4">
+        <h5 class="text-muted">Next round opens locally at:</h5>
+        <h4 id="local-time-display" class="text-primary fw-bold">Calculating...</h4>
+        <hr>
+        <h5 class="text-muted">Time remaining:</h5>
+        <h2 id="countdown-display" style="font-family: monospace; color: #2c3e50;">--:--:--</h2>
+    </div>
+
     <div class="alert alert-info mt-4">
         <strong>Important: Receive Your Daily Pay</strong><br><br>
         To ensure you are paid your daily base rate, please return to Prolific and submit your study using the button below. 
         <br><br>
-        You will receive a new Prolific message when the next round opens tomorrow.
+        You will receive a new Prolific message when the next round opens.
     </div>
 
     <div class="mt-4 text-center">
@@ -25,4 +33,30 @@
     .otree-timer { display: none !important; }
     .otree-btn-next { display: none !important; }
 </style>
+
+<script>
+    const targetDate = new Date("{{ next_round_timestamp }}");
+    
+    // Format the date dynamically to the user's browser timezone
+    const options = { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' };
+    document.getElementById("local-time-display").innerText = targetDate.toLocaleString(undefined, options);
+
+    // Live Countdown Timer
+    const timer = setInterval(function() {
+        const now = new Date().getTime();
+        const distance = targetDate.getTime() - now;
+
+        if (distance <= 0) {
+            clearInterval(timer);
+            document.getElementById("countdown-display").innerText = "Round is now open!";
+            // Optional: Automatically refresh the page to push them to the next round if they leave the tab open
+            // setTimeout(() => location.reload(), 3000); 
+        } else {
+            const h = Math.floor(distance / (1000 * 60 * 60)).toString().padStart(2, '0');
+            const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
+            const s = Math.floor((distance % (1000 * 60)) / 1000).toString().padStart(2, '0');
+            document.getElementById("countdown-display").innerText = `${h}h ${m}m ${s}s`;
+        }
+    }, 1000);
+</script>
 {{ endblock }}

@@ -163,15 +163,6 @@ class CapacityScreenout(Page):
         is_ghost = player.participant.vars.get('is_ghost', False)
         return player.round_number == 1 and is_screened and not is_ghost
 
-class NetworkWait(Page):
-    @staticmethod
-    def is_displayed(player: Player):
-        return player.round_number == 1 and not player.participant.vars.get('screened_out', False)
-
-    @staticmethod
-    def vars_for_template(player: Player):
-        return get_status_vars(player)
-
 class FeedTaskGatekeeper(Page):
     @staticmethod
     def is_displayed(player: Player):
@@ -293,13 +284,22 @@ class EndOfDayWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        # Dynamically serve the correct Prolific Completion Code based on the round
         if player.round_number == 1:
-            code = "DAY_0_INIT_CODE" # Code for your Day 0 (Intermediate) Prolific Study
+            code = "DAY_0_INIT_CODE" 
         else:
-            code = "DAILY_WAVE_CODE" # Code for your Day 1-6 Prolific Studies
+            code = "DAILY_WAVE_CODE" 
             
-        vars_dict = {'prolific_daily_code': code}
+        now = datetime.now(timezone.utc)
+        release_hour = player.session.config.get('daily_start_hour_utc', 14)
+        
+        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+            
+        vars_dict = {
+            'prolific_daily_code': code,
+            'next_round_timestamp': target.isoformat()
+        }
         vars_dict.update(get_status_vars(player))
         return vars_dict
 
