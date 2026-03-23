@@ -3,40 +3,26 @@
 {{ block content }}
 {{ include 'phase_2/StatusHeader.html' }}
 
-<div class="card shadow-sm p-4 text-center mt-5">
-    <h4 class="mb-4 text-primary">Day {{ player.round_number }} Complete</h4>
-    <p>Your responses have been saved. The next round will unlock automatically at the scheduled time.</p>
+<div class="card shadow-sm p-4 text-center mt-5 border-success">
+    <h4 class="mb-4 text-success">Round {{ player.round_number }} Complete</h4>
+    <p class="lead">Your responses have been saved and your node is updated.</p>
     
-    <div class="alert alert-light border mt-4">
-        <h5 class="text-muted">Next round opens in:</h5>
-        <h2 id="countdown-display" style="font-family: monospace; color: #2c3e50;">--:--:--</h2>
+    <div class="alert alert-info mt-4">
+        <strong>Important: Receive Your Daily Pay</strong><br><br>
+        To ensure you are paid your daily base rate, please return to Prolific and submit your study using the button below. 
+        <br><br>
+        You will receive a new Prolific message when the next round opens tomorrow.
     </div>
 
-    <p class="text-muted mt-4">You may safely close this tab. You will receive a Prolific message when the next round opens, or you can return to this link.</p>
+    <div class="mt-4 text-center">
+        <a href="https://app.prolific.com/submissions/complete?cc={{ prolific_daily_code }}" class="btn btn-success btn-lg px-5 py-3 shadow">
+            Submit Daily Task on Prolific
+        </a>
+    </div>
 </div>
 
 <style>
-    /* Absolute lockdown of oTree's native timer and buttons */
     .otree-timer { display: none !important; }
     .otree-btn-next { display: none !important; }
 </style>
-
-<script>
-    const targetDate = new Date("{{ next_round_timestamp }}");
-    const timer = setInterval(function() {
-        const now = new Date().getTime();
-        const distance = targetDate.getTime() - now;
-
-        if (distance <= 0) {
-            clearInterval(timer);
-            document.getElementById("countdown-display").innerText = "Round is now open! Redirecting...";
-            setTimeout(() => location.reload(), 2000); 
-        } else {
-            const h = Math.floor(distance / 3600000).toString().padStart(2, '0');
-            const m = Math.floor((distance % 3600000) / 60000).toString().padStart(2, '0');
-            const s = Math.floor((distance % 60000) / 1000).toString().padStart(2, '0');
-            document.getElementById("countdown-display").innerText = `${h}h ${m}m ${s}s`;
-        }
-    }, 1000);
-</script>
 {{ endblock }}

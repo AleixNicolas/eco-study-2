@@ -1,14 +1,19 @@
 {{ block title }}Study Capacity Reached{{ endblock }}
 {{ block content }}
-<div class="card shadow-sm p-4 text-center mt-5 border-danger">
-    <h4 class="mb-4 text-danger">Network Nodes Full</h4>
-    <p>Thank you for your interest. Unfortunately, the study is already full.</p>
+<div class="card shadow-sm p-4 text-center mt-5 border-info">
+    <h4 class="mb-4 text-info">Network Nodes Full</h4>
+    <p>Thank you for your prompt response! Unfortunately, all 20 nodes for the network have just been claimed.</p>
     
-    <div class="alert alert-warning mt-4">
-        <strong>Important Prolific Action Required:</strong><br>
-        Please return to your Prolific dashboard and select <strong>"Stop without completing"</strong> or <strong>"Return Submission"</strong>.
-        <br><br>
-        Do not submit a completion code, as we will be unable to approve it.
+    <div class="alert alert-success mt-4">
+        <strong>You will still be compensated for showing up today.</strong><br><br>
+        Please return to Prolific and submit the following completion code to receive your base payment for this session:
+        <h3 class="mt-3">OVERFLOW_CODE_HERE</h3>
+    </div>
+    
+    <div class="mt-4 text-center">
+        <a href="https://app.prolific.com/submissions/complete?cc=OVERFLOW_CODE_HERE" class="btn btn-primary btn-lg">
+            Return to Prolific
+        </a>
     </div>
 </div>
 <style>.otree-btn-next { display: none !important; }</style>
