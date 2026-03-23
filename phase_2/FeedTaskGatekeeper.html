@@ -1,13 +1,40 @@
-{{ block title }}Preparing Feed{{ endblock }}
+{{ block title }}
+    {{ if player.round_number == 1 }}Welcome to the Experiment{{ else }}Preparing Feed{{ endif }}
+{{ endblock }}
+
 {{ block content }}
 {{ include 'phase_2/StatusHeader.html' }}
 
-<div class="card shadow-sm p-4 text-center mt-5">
-    <h4 class="mb-4 text-primary">Welcome to Round {{ player.round_number }}</h4>
-    <p>Your network feed has been synced with the latest activity from your neighbors.</p>
-    <p>Click below to begin today's task.</p>
+<div class="card shadow-sm p-4 mt-5">
+    {{ if player.round_number == 1 }}
+        <h4 class="mb-3 text-primary text-center">Network Assignment Successful!</h4>
+        <p class="lead text-center">You have successfully secured your position as a node in the network.</p>
+        
+        <hr class="my-4">
+        
+        <h5>📖 Instructions for the Next 7 Days</h5>
+        <p>Every day, you will be asked to review a short feed of news articles related to the environment.</p>
+        <ul>
+            <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
+            <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
+            <li><strong>Impact:</strong> The articles you choose to share will be pushed directly to the feeds of your connected neighbors in the network.</li>
+        </ul>
+        
+        <div class="alert alert-info mt-4 text-center border-info">
+            <strong>Today's Task:</strong> To kickstart the network, your Day 1 feed contains randomly selected articles. Click below to make your initial sharing decisions and receive today's payment!
+        </div>
+        
+    {{ else }}
+        <h4 class="mb-4 text-primary text-center">Welcome to Round {{ player.round_number }}</h4>
+        <p class="text-center">Your network feed has been synced with the latest activity from your neighbors.</p>
+        <p class="text-center">Click below to begin today's task.</p>
+    {{ endif }}
 </div>
-<div class="text-center mt-4">
-    <button class="btn btn-success btn-lg otree-btn-next">View Daily Feed</button>
+
+<div class="text-center mt-4 mb-5">
+    <button class="btn btn-success btn-lg px-5 otree-btn-next">
+        {{ if player.round_number == 1 }}Begin Initialization Task{{ else }}View Daily Feed{{ endif }}
+    </button>
 </div>
+
 {{ endblock }}

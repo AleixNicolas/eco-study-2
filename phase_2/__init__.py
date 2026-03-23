@@ -334,7 +334,12 @@ class CompletionRedirect(Page):
         return vars_dict
 
 page_sequence = [
-    ArrivalGatekeeper, CapacityScreenout, NetworkWait,
-    FeedTaskGatekeeper, FeedTask, FinalOpinions, FinalFeedback, 
-    EndOfDayWait, CompletionRedirect
+    ArrivalGatekeeper, 
+    CapacityScreenout, 
+    FeedTaskGatekeeper, 
+    FeedTask, 
+    FinalOpinions, 
+    FinalFeedback, 
+    EndOfDayWait, 
+    CompletionRedirect
 ]
