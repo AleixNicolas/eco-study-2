@@ -3,37 +3,20 @@
 {{ block content }}
 {{ include 'phase_2/StatusHeader.html' }}
 
-<div class="card shadow-sm p-4 text-center mt-5">
+<div class="card shadow-sm p-4 text-center mt-5 border-primary">
     <h4 class="mb-4 text-primary">Network Assignment Successful!</h4>
     
-    {{ if network_full }}
-        <div class="alert alert-success">
-            <p class="lead mb-0">The network is now fully formed (20/20 nodes).</p>
-            <p class="mt-2 text-muted">You will be redirected momentarily...</p>
-        </div>
-    {{ else }}
-        <p class="lead">You have successfully secured your position in the network.</p>
-        <p class="text-muted">We are currently waiting for the remaining participants to claim their nodes.</p>
-        <h5 class="mt-4">Round 1 officially begins on:</h5>
-        <h3 class="text-info font-weight-bold my-3">{{ start_date }}</h3>
-        
-        <div class="alert alert-info mt-4">
-            <strong>Action Required:</strong><br>
-            You may now safely close this tab. Please return to this exact link via Prolific on the specified date.
-        </div>
-    {{ endif }}
+    <p class="lead">You have successfully secured your position as a node in the network.</p>
+    <p class="text-muted">To finalize your registration and receive your payment for today's session, you must complete your initialization task.</p>
+    
+    <div class="alert alert-info mt-4">
+        <strong>Action Required:</strong><br>
+        Click the button below to review your first set of articles and make your initial sharing decisions. 
+    </div>
+
+    <div class="mt-4">
+        <button class="btn btn-primary btn-lg otree-btn-next">Begin Initialization Task</button>
+    </div>
 </div>
 
-<style>
-    .otree-timer { display: none !important; }
-    .otree-btn-next { display: none !important; }
-</style>
-
-<script>
-    {{ if not network_full }}
-        setTimeout(function() {
-            window.location.reload();
-        }, 10000);
-    {{ endif }}
-</script>
 {{ endblock }}

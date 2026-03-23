@@ -170,21 +170,7 @@ class NetworkWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        all_players = player.subsession.get_players()
-        assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
-        
-        vars_dict = {
-            'network_full': assigned_count >= 20,
-            'start_date': player.session.config.get('start_date', 'the specified date')
-        }
-        vars_dict.update(get_status_vars(player))
-        return vars_dict
-
-    @staticmethod
-    def get_timeout_seconds(player: Player):
-        all_players = player.subsession.get_players()
-        assigned_count = len([p for p in all_players if p.field_maybe_none('node_id') is not None])
-        return 1 if assigned_count >= 20 else 86400 * 30
+        return get_status_vars(player)
 
 class FeedTaskGatekeeper(Page):
     @staticmethod
@@ -307,7 +293,13 @@ class EndOfDayWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        vars_dict = {'prolific_daily_code': "PROLIFIC_DAILY_CODE_PLACEHOLDER"}
+        # Dynamically serve the correct Prolific Completion Code based on the round
+        if player.round_number == 1:
+            code = "DAY_0_INIT_CODE" # Code for your Day 0 (Intermediate) Prolific Study
+        else:
+            code = "DAILY_WAVE_CODE" # Code for your Day 1-6 Prolific Studies
+            
+        vars_dict = {'prolific_daily_code': code}
         vars_dict.update(get_status_vars(player))
         return vars_dict
 
