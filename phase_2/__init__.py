@@ -60,10 +60,90 @@ class Subsession(BaseSubsession):
 def creating_session(subsession: Subsession):
     pass
 
+def vars_for_admin_report(subsession: Subsession):
+    players = subsession.get_players()
+    
+    valid_players = [p for p in players if not p.participant.vars.get('screened_out', True)]
+    total_players = len(valid_players)
+    
+    feed_lean_percentages = {}
+    avg_opinion_change = {}
+    
+    sort_order = {
+        "Far Left": 1, "Left": 2, "Lean Left": 3, 
+        "Center": 4, 
+        "Lean Right": 5, "Right": 6, "Far Right": 7, 
+        "Unknown": 8
+    }
+    
+    for cat in ['High_Concern', 'Low_Concern']:
+        cat_players = [p for p in valid_players if p.participant.vars.get('assigned_category') == cat]
+        
+        leaning_counts = {}
+        total_articles = 0
+        
+        for p in cat_players:
+            for p_round in p.in_all_rounds():
+                feed_data = p_round.field_maybe_none('incoming_feed')
+                if feed_data:
+                    try:
+                        feed = json.loads(feed_data)
+                        for item in feed:
+                            lean = item.get('leaning', 'Unknown')
+                            leaning_counts[lean] = leaning_counts.get(lean, 0) + 1
+                            total_articles += 1
+                    except json.JSONDecodeError:
+                        pass
+                        
+        lean_pcts = {}
+        if total_articles > 0:
+            for lean, count in leaning_counts.items():
+                lean_pcts[lean] = round((count / total_articles) * 100, 1)
+        else:
+            lean_pcts['No Data Yet'] = 0
+            
+        sorted_lean_pcts = {k: v for k, v in sorted(lean_pcts.items(), key=lambda item: sort_order.get(item[0], 99))}
+        feed_lean_percentages[cat] = sorted_lean_pcts
+
+        changes = {'opinion_1': [], 'opinion_2': [], 'opinion_3': [], 'opinion_4': []}
+        
+        for p in cat_players:
+            for i in range(1, 5):
+                baseline = p.participant.vars.get(f'baseline_opinion_{i}')
+                
+                final_opinion = None
+                for p_round in reversed(p.in_all_rounds()):
+                    val = getattr(p_round, f'opinion_{i}', None)
+                    if val is not None:
+                        final_opinion = val
+                        break
+                
+                if baseline is not None and final_opinion is not None:
+                    try:
+                        changes[f'opinion_{i}'].append(int(final_opinion) - int(baseline))
+                    except ValueError:
+                        pass
+                        
+        avg_change = {}
+        for key, value_list in changes.items():
+            if value_list:
+                avg_change[key] = round(sum(value_list) / len(value_list), 2)
+            else:
+                avg_change[key] = "N/A"
+                
+        avg_opinion_change[cat] = avg_change
+
+    return {
+        'total_players': total_players,
+        'feed_lean_percentages': feed_lean_percentages,
+        'avg_opinion_change': avg_opinion_change
+    }
+
 class Group(BaseGroup):
     pass
 
 class Player(BasePlayer):
+    prolific_id = models.StringField(blank=True)
     node_id = models.IntegerField(blank=True, null=True)
     category = models.StringField(blank=True) 
     screened_out = models.BooleanField(initial=False)
@@ -119,7 +199,8 @@ class ArrivalGatekeeper(Page):
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
         if timeout_happened:
-            player.screened_out = True
+            for p in player.in_all_rounds():
+                p.screened_out = True
             player.participant.vars['screened_out'] = True
             player.participant.vars['is_ghost'] = True
             return
@@ -127,15 +208,20 @@ class ArrivalGatekeeper(Page):
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
         player.participant.vars['prolific_id'] = p_label
         
+        for p in player.in_all_rounds():
+            p.prolific_id = p_label
+        
         if p_label in Constants.MAPPING:
             data = Constants.MAPPING[p_label]
             cat = data.get('category')
             player.participant.vars['assigned_category'] = cat
+            player.participant.vars['baseline_opinion_1'] = data.get('opinion_1')
+            player.participant.vars['baseline_opinion_2'] = data.get('opinion_2')
+            player.participant.vars['baseline_opinion_3'] = data.get('opinion_3')
+            player.participant.vars['baseline_opinion_4'] = data.get('opinion_4')
         else:
             cat = 'High_Concern' if player.id_in_group <= 10 else 'Low_Concern'
             player.participant.vars['assigned_category'] = cat
-
-        player.category = cat
 
         with SYSTEM_LOCK:
             all_players = player.subsession.get_players()
@@ -148,12 +234,17 @@ class ArrivalGatekeeper(Page):
 
             if available_nodes:
                 assigned_node = min(available_nodes)
-                player.node_id = assigned_node
+                
+                for p in player.in_all_rounds():
+                    p.node_id = assigned_node
+                    p.category = cat
+                    p.screened_out = False
+                    
                 player.participant.vars['node_id'] = assigned_node
-                player.screened_out = False
                 player.participant.vars['screened_out'] = False 
             else:
-                player.screened_out = True
+                for p in player.in_all_rounds():
+                    p.screened_out = True
                 player.participant.vars['screened_out'] = True 
 
 class CapacityScreenout(Page):
@@ -170,8 +261,12 @@ class FeedTaskGatekeeper(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        player.node_id = player.participant.vars.get('node_id')
-        player.category = player.participant.vars.get('assigned_category')
+        if not player.category:
+            player.category = player.participant.vars.get('assigned_category')
+        if not player.node_id:
+            player.node_id = player.participant.vars.get('node_id')
+        if not player.prolific_id:
+            player.prolific_id = player.participant.vars.get('prolific_id', '')
 
         if 'backlog' not in player.participant.vars:
             player.participant.vars['backlog'] = {}
