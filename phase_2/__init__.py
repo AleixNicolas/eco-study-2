@@ -20,6 +20,7 @@ class Constants(BaseConstants):
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.50
+    FINAL_ROUND_PAY = 1.50  # NEW: Higher base pay for the final day
     BONUS_AMOUNT = 5.00
     MAX_ALLOWED_MISSES = 1
     

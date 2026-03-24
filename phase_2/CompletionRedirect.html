@@ -1,61 +1,42 @@
 {{ block title }}Experiment Complete{{ endblock }}
+
 {{ block content }}
 {{ include 'phase_2/StatusHeader.html' }}
 
-<div class="card shadow-lg border-0 mt-4 mb-5">
-    <div class="card-header bg-success text-white text-center py-4">
-        <h2 class="mb-0">Congratulations!</h2>
-        <p class="mb-0 mt-2">You have successfully completed the 7-day study.</p>
-    </div>
+<div class="card shadow-sm p-4 mt-4 border-success">
+    <h3 class="text-success text-center mb-4">Thank You For Participating!</h3>
     
-    <div class="card-body p-5">
-        <h4 class="text-center mb-4 text-muted">Final Reward Summary</h4>
+    <div class="alert alert-light border">
+        <h5 class="text-primary">Your Final Payout Summary</h5>
+        <p class="small text-muted mb-3">
+            <em>Note: You have already been compensated for your previous daily waves. This summary reflects your payment for today's final session, plus any earned longitudinal bonuses.</em>
+        </p>
         
-        <ul class="list-group list-group-flush mb-4" style="font-size: 1.1rem;">
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>Rounds Completed ({{ completed_rounds }} / 7)</span>
-                <strong>{{ base_pay }}</strong>
+        <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent">
+                Final Day Base Pay
+                <span class="fw-bold">{{ final_base_pay }}</span>
             </li>
-            
-            {{ if earned_bonus }}
-            <li class="list-group-item d-flex justify-content-between align-items-center list-group-item-success">
-                <span><strong>Completion Bonus Secured</strong> 🧰</span>
-                <strong>+ {{ final_bonus_amount }}</strong>
-            </li>
-            {{ else }}
-            <li class="list-group-item d-flex justify-content-between align-items-center bg-light text-muted" style="font-size: 0.95rem;">
-                <div>
-                    <span>Completion Bonus Eligibility</span><br>
-                    <small>Requirement: 6/7 Rounds | Status: Not Met</small>
-                </div>
-                <strong>$0.00</strong>
-            </li>
-            {{ endif }}
-            
-            <li class="list-group-item d-flex justify-content-between align-items-center mt-3 border-top border-2">
-                <span class="fs-5"><strong>Total Final Payout</strong></span>
-                <span class="fs-4 text-primary"><strong>{{ total_pay }}</strong></span>
+            <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent">
+                Completion Bonus
+                <span class="fw-bold text-success">+ {{ final_bonus_amount }}</span>
             </li>
         </ul>
-
-        {{ if lottery_eligible }}
-        <div class="alert alert-warning text-center border-warning mt-4 shadow-sm">
-            <h5 class="alert-heading mb-2">🎟️ $100 Lottery Entry Confirmed! 🎟️</h5>
-            <p class="mb-0 small">Because you maintained perfect attendance across all 7 rounds, your Prolific ID has been automatically entered into the grand prize draw.</p>
-        </div>
-        {{ else }}
-        <div class="alert alert-secondary text-center mt-4">
-            <h6 class="mb-1 text-muted">Lottery Entry Status</h6>
-            <p class="mb-0 small text-muted">Requirement: 7/7 Rounds | Status: Not Met.</p>
-        </div>
-        {{ endif }}
-
-        <div class="text-center mt-5">
-            <a href="{{ completion_url }}" class="btn btn-primary btn-lg px-5 py-3 shadow">
-                Return to Prolific & Complete Study
-            </a>
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <h5 class="mb-0"><strong>Total Reward Pending:</strong></h5>
+            <h4 class="mb-0 text-success"><strong>{{ total_final_payment }}</strong></h4>
         </div>
     </div>
+
+    {{ if lottery_eligible }}
+    <div class="alert alert-success mt-3 text-center shadow-sm">
+        🎉 <strong>Perfect Attendance!</strong> Because you missed 0 days, you have been entered into the final lottery drawing.
+    </div>
+    {{ endif }}
+
+    <div class="text-center mt-5 mb-3">
+        <a href="{{ completion_url }}" class="btn btn-primary btn-lg px-5">Return to Prolific</a>
+    </div>
 </div>
-<style>.otree-btn-next { display: none !important; }</style>
 {{ endblock }}
