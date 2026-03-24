@@ -58,7 +58,27 @@ class Subsession(BaseSubsession):
     pass
 
 def creating_session(subsession: Subsession):
-    pass
+    if subsession.round_number == 1:
+        # 1. Determine Network Mode from Heroku Config Var
+        mode = os.environ.get('NETWORK_MODE', 'segregated').lower()
+        subsession.session.vars['network_mode'] = mode
+
+        # 2. Prepare the 20 nodes
+        all_nodes = list(range(1, 21))
+
+        if mode == 'segregated':
+            # Nodes 1-10 clustered for High_Concern, 11-20 for Low_Concern
+            high_nodes = list(range(1, 11))
+            low_nodes = list(range(11, 21))
+        else:
+            # Non-segregated: Shuffle nodes to randomize positions, split evenly
+            random.shuffle(all_nodes)
+            high_nodes = all_nodes[:10]
+            low_nodes = all_nodes[10:]
+
+        # 3. Store the available nodes in session.vars to manage concurrency
+        subsession.session.vars['available_high_nodes'] = high_nodes
+        subsession.session.vars['available_low_nodes'] = low_nodes
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
@@ -224,17 +244,14 @@ class ArrivalGatekeeper(Page):
             player.participant.vars['assigned_category'] = cat
 
         with SYSTEM_LOCK:
-            all_players = player.subsession.get_players()
-            assigned_nodes = [
-                p.field_maybe_none('node_id') for p in all_players if p.field_maybe_none('node_id') is not None
-            ]
+            assigned_node = None
             
-            target_nodes = list(range(1, 11)) if cat == 'High_Concern' else list(range(11, 21))
-            available_nodes = [n for n in target_nodes if n not in assigned_nodes]
+            if cat == 'High_Concern' and player.session.vars['available_high_nodes']:
+                assigned_node = player.session.vars['available_high_nodes'].pop(0)
+            elif cat == 'Low_Concern' and player.session.vars['available_low_nodes']:
+                assigned_node = player.session.vars['available_low_nodes'].pop(0)
 
-            if available_nodes:
-                assigned_node = min(available_nodes)
-                
+            if assigned_node is not None:
                 for p in player.in_all_rounds():
                     p.node_id = assigned_node
                     p.category = cat
