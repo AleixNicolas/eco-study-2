@@ -113,7 +113,7 @@ def vars_for_admin_report(subsession: Subsession):
                 
                 final_opinion = None
                 for p_round in reversed(p.in_all_rounds()):
-                    val = getattr(p_round, f'opinion_{i}', None)
+                    val = p_round.field_maybe_none(f'opinion_{i}')
                     if val is not None:
                         final_opinion = val
                         break
@@ -242,10 +242,16 @@ class ArrivalGatekeeper(Page):
                     
                 player.participant.vars['node_id'] = assigned_node
                 player.participant.vars['screened_out'] = False 
+                
+                # Update label to display cleanly in the Monitor tab
+                player.participant.label = f"{p_label} | Node {assigned_node} | {cat}"
             else:
                 for p in player.in_all_rounds():
                     p.screened_out = True
                 player.participant.vars['screened_out'] = True 
+                
+                # Update label for screened out users
+                player.participant.label = f"{p_label} | SCREENED OUT"
 
 class CapacityScreenout(Page):
     @staticmethod
