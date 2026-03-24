@@ -7,17 +7,18 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 doc = """
-Phase 2: 8-Day Asynchronous Network Experiment.
-Round 1 is Day 0 (Network Initialization).
-Rounds 2-8 are Days 1-7 (Daily Waves).
+Phase 2: Asynchronous Network Experiment.
+Configurable via Heroku Config Vars.
 """
 
 SYSTEM_LOCK = threading.Lock()
 
 class Constants(BaseConstants):
     name_in_url = 'phase_2'
-    players_per_group = 20
-    num_rounds = 8
+    
+    # Dynamic Constants pulled from Heroku (evaluated once at server startup)
+    num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
+    players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.50
     BONUS_AMOUNT = 5.00
@@ -54,29 +55,48 @@ class Constants(BaseConstants):
         'opinion_4': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}
     }
 
+# --- Centralized Time Logic ---
+def calculate_deadline(round_number):
+    """Calculates the deadline timestamp for a given round based on Config Vars."""
+    base_time_str = os.environ.get('NETWORK_DAILY_START_HOUR_UTC', '2026-03-23T16:15:00')
+    try:
+        # Parse ISO format string
+        base_time = datetime.strptime(base_time_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        # Fallback if formatted incorrectly
+        base_time = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
+        
+    test_interval = os.environ.get('NETWORK_TEST_INTERVAL_MINUTES')
+    
+    if test_interval:
+        delta = timedelta(minutes=int(test_interval))
+    else:
+        delta = timedelta(days=1)
+        
+    return base_time + (delta * round_number)
+
+
 class Subsession(BaseSubsession):
     pass
 
 def creating_session(subsession: Subsession):
     if subsession.round_number == 1:
-        # 1. Determine Network Mode from Heroku Config Var
         mode = os.environ.get('NETWORK_MODE', 'segregated').lower()
         subsession.session.vars['network_mode'] = mode
 
-        # 2. Prepare the 20 nodes
-        all_nodes = list(range(1, 21))
+        # Dynamically scale node availability to the exact network size
+        network_size = Constants.players_per_group
+        all_nodes = list(range(1, network_size + 1))
+        half = network_size // 2
 
         if mode == 'segregated':
-            # Nodes 1-10 clustered for High_Concern, 11-20 for Low_Concern
-            high_nodes = list(range(1, 11))
-            low_nodes = list(range(11, 21))
+            high_nodes = list(range(1, half + 1))
+            low_nodes = list(range(half + 1, network_size + 1))
         else:
-            # Non-segregated: Shuffle nodes to randomize positions, split evenly
             random.shuffle(all_nodes)
-            high_nodes = all_nodes[:10]
-            low_nodes = all_nodes[10:]
+            high_nodes = all_nodes[:half]
+            low_nodes = all_nodes[half:]
 
-        # 3. Store the available nodes in session.vars to manage concurrency
         subsession.session.vars['available_high_nodes'] = high_nodes
         subsession.session.vars['available_low_nodes'] = low_nodes
 
@@ -155,6 +175,7 @@ def vars_for_admin_report(subsession: Subsession):
 
     return {
         'total_players': total_players,
+        'network_size': Constants.players_per_group,
         'feed_lean_percentages': feed_lean_percentages,
         'avg_opinion_change': avg_opinion_change
     }
@@ -240,7 +261,9 @@ class ArrivalGatekeeper(Page):
             player.participant.vars['baseline_opinion_3'] = data.get('opinion_3')
             player.participant.vars['baseline_opinion_4'] = data.get('opinion_4')
         else:
-            cat = 'High_Concern' if player.id_in_group <= 10 else 'Low_Concern'
+            # Dynamically scale test assignment based on network size
+            half = Constants.players_per_group // 2
+            cat = 'High_Concern' if player.id_in_group <= half else 'Low_Concern'
             player.participant.vars['assigned_category'] = cat
 
         with SYSTEM_LOCK:
@@ -259,16 +282,12 @@ class ArrivalGatekeeper(Page):
                     
                 player.participant.vars['node_id'] = assigned_node
                 player.participant.vars['screened_out'] = False 
-                
-                # Update label to display cleanly in the Monitor tab
-                player.participant.label = f"{p_label} | Node {assigned_node} | {cat}"
+                player.participant.label = p_label
             else:
                 for p in player.in_all_rounds():
                     p.screened_out = True
                 player.participant.vars['screened_out'] = True 
-                
-                # Update label for screened out users
-                player.participant.label = f"{p_label} | SCREENED OUT"
+                player.participant.label = p_label
 
 class CapacityScreenout(Page):
     @staticmethod
@@ -356,7 +375,13 @@ class FeedTask(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        return get_status_vars(player)
+        target = calculate_deadline(player.round_number)
+            
+        vars_dict = {
+            'deadline_timestamp': target.isoformat()
+        }
+        vars_dict.update(get_status_vars(player))
+        return vars_dict
 
     @staticmethod
     def js_vars(player: Player):
@@ -407,12 +432,7 @@ class EndOfDayWait(Page):
         else:
             code = "DAILY_WAVE_CODE" 
             
-        now = datetime.now(timezone.utc)
-        release_hour = player.session.config.get('daily_start_hour_utc', 14)
-        
-        target = now.replace(hour=release_hour, minute=0, second=0, microsecond=0)
-        if target <= now:
-            target += timedelta(days=1)
+        target = calculate_deadline(player.round_number)
             
         vars_dict = {
             'prolific_daily_code': code,

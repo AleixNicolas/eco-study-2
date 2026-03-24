@@ -5,12 +5,11 @@ SECRET_KEY = environ.get('OTREE_SECRET_KEY', '2003881942849')
 SESSION_CONFIGS = [
     dict(
         name='phase2_main_network',
-        display_name="Phase 2: 8-Day Network Experiment (Includes Init)",
+        display_name="Phase 2: 8-Day Network Experiment",
         app_sequence=['phase_2'],
-        num_demo_participants=20,
+        # Dynamically pull the room size, default to 40 if not set
+        num_demo_participants=int(environ.get('NETWORK_DEMO_PARTICIPANTS', 40)),
         completion_url='https://app.prolific.com/submissions/complete?cc=FINAL_BONUS_CODE',
-        start_date="Monday, October 16th", 
-        daily_start_hour_utc=14, 
     ),
 ]
 
@@ -20,12 +19,13 @@ SESSION_CONFIG_DEFAULTS = dict(
 
 PARTICIPANT_FIELDS = [
     'prolific_id', 'node_id', 'assigned_category', 'baseline_opinion_1',
-    'baseline_opinion_2', 'baseline_opinion_3', 'baseline_opinion_4', 'backlog'
+    'baseline_opinion_2', 'baseline_opinion_3', 'baseline_opinion_4', 'backlog',
+    'screened_out', 'is_ghost'
 ]
 SESSION_FIELDS = []
 
 ROOMS = [
-    dict(name='main_network_room', display_name='Main 20-Node Network Room'),
+    dict(name='main_network_room', display_name='Main Network Room'),
 ]
 
 LANGUAGE_CODE = 'en'
