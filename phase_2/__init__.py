@@ -7,8 +7,8 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 doc = """
-Phase 2: Asynchronous Network Experiment.
-Configurable via Heroku Config Vars.
+Phase 2: 8-Day Asynchronous Network Experiment.
+Configurable via Heroku Config Vars. Manual Advancement enabled.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -16,7 +16,7 @@ SYSTEM_LOCK = threading.Lock()
 class Constants(BaseConstants):
     name_in_url = 'phase_2'
     
-    # Dynamic Constants pulled from Heroku (evaluated once at server startup)
+    # Dynamic Constants pulled from Heroku Config Vars
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
@@ -55,15 +55,12 @@ class Constants(BaseConstants):
         'opinion_4': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}
     }
 
-# --- Centralized Time Logic ---
 def calculate_deadline(round_number):
     """Calculates the deadline timestamp for a given round based on Config Vars."""
     base_time_str = os.environ.get('NETWORK_DAILY_START_HOUR_UTC', '2026-03-23T16:15:00')
     try:
-        # Parse ISO format string
         base_time = datetime.strptime(base_time_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
     except ValueError:
-        # Fallback if formatted incorrectly
         base_time = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
         
     test_interval = os.environ.get('NETWORK_TEST_INTERVAL_MINUTES')
@@ -261,7 +258,6 @@ class ArrivalGatekeeper(Page):
             player.participant.vars['baseline_opinion_3'] = data.get('opinion_3')
             player.participant.vars['baseline_opinion_4'] = data.get('opinion_4')
         else:
-            # Dynamically scale test assignment based on network size
             half = Constants.players_per_group // 2
             cat = 'High_Concern' if player.id_in_group <= half else 'Low_Concern'
             player.participant.vars['assigned_category'] = cat

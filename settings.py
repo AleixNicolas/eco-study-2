@@ -7,7 +7,6 @@ SESSION_CONFIGS = [
         name='phase2_main_network',
         display_name="Phase 2: 8-Day Network Experiment",
         app_sequence=['phase_2'],
-        # Dynamically pull the room size, default to 40 if not set
         num_demo_participants=int(environ.get('NETWORK_DEMO_PARTICIPANTS', 40)),
         completion_url='https://app.prolific.com/submissions/complete?cc=FINAL_BONUS_CODE',
     ),
