@@ -1,3 +1,58 @@
+{{ block title }}News Feed - Round {{ player.round_number }}{{ endblock }}
+
+{{ block content }}
+<style>
+    .compact-decision .controls { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: flex-start; gap: 15px; } 
+    .compact-decision .form-check { margin-bottom: 0 !important; white-space: nowrap; } 
+    .compact-decision .form-check-label { font-size: 0.85rem; }
+    .news-item { padding: 8px 10px !important; margin-bottom: 6px !important; border-radius: 6px; } 
+    .news-item h6 { font-size: 0.9rem; margin-bottom: 4px !important; line-height: 1.2; } 
+    #reading-pane { top: 10px; min-height: 350px; height: calc(100vh - 200px); overflow-y: auto; } 
+    .mobile-article-body { display: none; background-color: #fff; border-left: 3px solid #0d6efd; } 
+    .mobile-article-body.show { display: block; } 
+    @media (max-width: 767px) {
+        .compact-decision .controls { flex-wrap: wrap !important; gap: 5px; }
+        #reading-pane { height: auto; min-height: 200px; }
+    }
+    .timer-container { font-family: monospace; font-size: 1.25rem; font-weight: bold; }
+</style>
+
+{{ include 'phase_2/StatusHeader.html' }}
+
+<div class="alert alert-warning d-flex flex-column flex-md-row justify-content-between align-items-center shadow-sm mb-4" id="deadline-banner">
+    <div class="mb-2 mb-md-0 text-center text-md-start">
+        <strong>Daily Deadline:</strong> Submit your decisions before time expires.
+    </div>
+    <div class="timer-container" id="visual-timer">--:--:--</div>
+</div>
+
+<input type="hidden" name="outgoing_shares" id="outgoing_shares">
+<input type="hidden" name="average_feed_size" id="average_feed_size">
+<input type="hidden" name="max_feed_size" id="max_feed_size">
+<input type="hidden" name="average_pending_items" id="average_pending_items">
+<input type="hidden" name="max_pending_items" id="max_pending_items">
+<input type="hidden" name="total_time_on_feed" id="total_time_on_feed">
+
+<div class="row">
+    <div class="col-md-8 order-2 order-md-1" style="padding-right: 15px;">
+        <p class="text-muted small mb-2 d-block d-md-none">Review the news articles below. Tap "Read More" to expand.</p>
+        <p class="text-muted small mb-2 d-none d-md-block">Review the articles. You may read the story before deciding whether to share each article.</p>
+        <div id="feed-container"></div>
+        
+        <div class="text-center mt-4 mb-5">
+            <button type="button" class="btn btn-success btn-lg px-5" id="submit-btn" onclick="submitFeed()">Complete Round</button>
+        </div>
+    </div>
+
+    <div class="col-md-4 order-1 order-md-2 mb-3 d-none d-md-block">
+        <div id="reading-pane" class="card shadow-sm p-3 sticky-top">
+            <h5 id="display-headline" class="h6 text-primary">Select an article to read</h5>
+            <hr class="my-2">
+            <p id="display-body" class="small text-muted" style="line-height: 1.45;"></p>
+        </div>
+    </div>
+</div>
+
 <script>
     let startTime = Date.now();
     let feedData = js_vars.incoming_feed;
@@ -16,8 +71,8 @@
             document.getElementById("deadline-banner").classList.remove("alert-warning");
             document.getElementById("deadline-banner").classList.add("alert-danger");
             
-            // The form and submit button are no longer disabled here.
-            // Participants can still submit until you manually advance them.
+            // Note: The form and submit button are NO LONGER disabled here.
+            // Participants can still submit even if they are late.
         } else {
             const h = Math.floor(distance / (1000 * 60 * 60)).toString().padStart(2, '0');
             const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
@@ -117,3 +172,4 @@
         document.getElementById('form').submit();
     }
 </script>
+{{ endblock }}
