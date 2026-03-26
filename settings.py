@@ -8,7 +8,7 @@ SESSION_CONFIGS = [
         display_name="Phase 2: 8-Day Network Experiment",
         app_sequence=['phase_2'],
         num_demo_participants=int(environ.get('NETWORK_DEMO_PARTICIPANTS', 40)),
-        completion_url='https://app.prolific.com/submissions/complete?cc=FINAL_BONUS_CODE',
+        completion_url='https://app.prolific.com/submissions/complete?cc=FINAL_WAVE_CODE',
     ),
 ]
 
@@ -21,7 +21,8 @@ PARTICIPANT_FIELDS = [
     'baseline_opinion_2', 'baseline_opinion_3', 'baseline_opinion_4', 'backlog',
     'screened_out', 'is_ghost'
 ]
-SESSION_FIELDS = []
+
+SESSION_FIELDS = ['network_mode', 'available_high_nodes', 'available_low_nodes']
 
 ROOMS = [
     dict(name='main_network_room', display_name='Main Network Room'),

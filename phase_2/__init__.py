@@ -20,7 +20,7 @@ class Constants(BaseConstants):
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.50
-    FINAL_ROUND_PAY = 1.50  # NEW: Higher base pay for the final day
+    FINAL_ROUND_PAY = 1.50
     BONUS_AMOUNT = 5.00
     MAX_ALLOWED_MISSES = 1
     
@@ -351,7 +351,6 @@ class FeedTaskGatekeeper(Page):
 
     @staticmethod
     def before_next_page(player: Player, timeout_happened):
-        # We generate the feed safely here right before they enter the task
         generate_feed_for_player(player)
 
 class FeedTask(Page):
@@ -415,11 +414,7 @@ class EndOfDayWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        if player.round_number == 1:
-            code = "DAY_0_INIT_CODE" 
-        else:
-            code = "DAILY_WAVE_CODE" 
-            
+        code = "DAILY_WAVE_CODE" 
         target = calculate_deadline(player.round_number)
             
         vars_dict = {
@@ -440,18 +435,18 @@ class CompletionRedirect(Page):
         completed_rounds = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
         missed_rounds = Constants.num_rounds - completed_rounds
         
-        base_pay = completed_rounds * Constants.PAY_PER_ROUND
+        final_base_pay = Constants.FINAL_ROUND_PAY if player.participated_this_round else 0.00
         bonus = Constants.BONUS_AMOUNT if missed_rounds <= Constants.MAX_ALLOWED_MISSES else 0.00
-        total_pay = base_pay + bonus
+        total_final_payment = final_base_pay + bonus
         
         lottery_eligible = (missed_rounds == 0)
         completion_url = player.session.config.get('completion_url', '')
         
         vars_dict = {
             'completed_rounds': completed_rounds,
-            'base_pay': f"${base_pay:.2f}",
+            'final_base_pay': f"${final_base_pay:.2f}",
             'final_bonus_amount': f"${bonus:.2f}",
-            'total_pay': f"${total_pay:.2f}",
+            'total_final_payment': f"${total_final_payment:.2f}",
             'earned_bonus': bonus > 0,
             'lottery_eligible': lottery_eligible,
             'completion_url': completion_url
