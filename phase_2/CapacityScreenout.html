@@ -1,20 +1,35 @@
-{{ block title }}Study Capacity Reached{{ endblock }}
+{{ block title }}Experiment Status{{ endblock }}
+
 {{ block content }}
-<div class="card shadow-sm p-4 text-center mt-5 border-info">
-    <h4 class="mb-4 text-info">Network Nodes Full</h4>
-    <p>Thank you for your prompt response! Unfortunately, all 20 nodes for the network have just been claimed.</p>
+<div class="card shadow-sm p-4 mt-5 text-center">
     
-    <div class="alert alert-success mt-4">
-        <strong>You will still be compensated for showing up today.</strong><br><br>
-        Please return to Prolific and submit the following completion code to receive your base payment for this session:
-        <h3 class="mt-3">DAY_0_INIT_CODE</h3>
-    </div>
-    
-    <div class="mt-4 text-center">
-        <a href="https://app.prolific.com/submissions/complete?cc=DAY_0_INIT_CODE" class="btn btn-primary btn-lg">
-            Return to Prolific
-        </a>
-    </div>
+    {{ if screenout_reason == 'invalid_id' }}
+        <h3 class="text-danger mb-4">Invalid or Missing ID</h3>
+        <p class="lead">We could not find your Prolific ID in the authorized list for this study.</p>
+        <p class="text-muted">If you believe this is an error, please ensure you clicked the exact link provided in the Prolific instructions, without accidentally altering the URL. If you are still having trouble, please contact the researcher directly via the Prolific messaging system.</p>
+        
+        <div class="alert alert-danger mt-4">
+            <strong>Action Required:</strong> Please return this submission on Prolific. We cannot compensate unauthorized access attempts or incorrect IDs.
+        </div>
+        
+    {{ elif screenout_reason == 'network_full' }}
+        <h3 class="text-warning mb-4">Network Capacity Reached</h3>
+        <p class="lead">Thank you for your interest. Unfortunately, all available positions in the network have already been filled for this session.</p>
+        <p class="text-muted">As mentioned in the study description, positions in the network are assigned on a first-come, first-served basis among eligible participants. We appreciate your time and promptness.</p>
+        
+        <div class="alert alert-success mt-4">
+            <strong>Compensation for your time:</strong><br>
+            You will still be paid a show-up fee for arriving today. Please submit the study on Prolific using the code below:
+            <h4 class="mt-3 mb-1 fw-bold text-primary">NETWORK_FULL_CODE</h4>
+        </div>
+        
+    {{ else }}
+        <h3 class="text-warning mb-4">Unable to Proceed</h3>
+        <p class="lead">You cannot proceed with the experiment at this time.</p>
+        <div class="alert alert-secondary mt-4">
+            Please return this submission on Prolific.
+        </div>
+    {{ endif }}
+
 </div>
-<style>.otree-btn-next { display: none !important; }</style>
 {{ endblock }}

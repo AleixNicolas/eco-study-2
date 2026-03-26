@@ -291,6 +291,7 @@ class ArrivalGatekeeper(Page):
                 p.screened_out = True
             player.participant.vars['screened_out'] = True
             player.participant.vars['is_ghost'] = True
+            player.participant.vars['screenout_reason'] = 'timeout'
             return
 
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
@@ -299,18 +300,21 @@ class ArrivalGatekeeper(Page):
         for p in player.in_all_rounds():
             p.prolific_id = p_label
         
-        if p_label in Constants.MAPPING:
-            data = Constants.MAPPING[p_label]
-            cat = data.get('category')
-            player.participant.vars['assigned_category'] = cat
-            player.participant.vars['baseline_opinion_1'] = data.get('opinion_1')
-            player.participant.vars['baseline_opinion_2'] = data.get('opinion_2')
-            player.participant.vars['baseline_opinion_3'] = data.get('opinion_3')
-            player.participant.vars['baseline_opinion_4'] = data.get('opinion_4')
-        else:
-            half = Constants.players_per_group // 2
-            cat = 'High_Concern' if player.id_in_group <= half else 'Low_Concern'
-            player.participant.vars['assigned_category'] = cat
+        # --- STRICT MAPPING ENFORCEMENT ---
+        if p_label not in Constants.MAPPING:
+            for p in player.in_all_rounds():
+                p.screened_out = True
+            player.participant.vars['screened_out'] = True
+            player.participant.vars['screenout_reason'] = 'invalid_id'  # Flag why they are screened out
+            return 
+
+        data = Constants.MAPPING[p_label]
+        cat = data.get('category')
+        player.participant.vars['assigned_category'] = cat
+        player.participant.vars['baseline_opinion_1'] = data.get('opinion_1')
+        player.participant.vars['baseline_opinion_2'] = data.get('opinion_2')
+        player.participant.vars['baseline_opinion_3'] = data.get('opinion_3')
+        player.participant.vars['baseline_opinion_4'] = data.get('opinion_4')
 
         with SYSTEM_LOCK:
             assigned_node = None
@@ -331,6 +335,7 @@ class ArrivalGatekeeper(Page):
                 for p in player.in_all_rounds():
                     p.screened_out = True
                 player.participant.vars['screened_out'] = True 
+                player.participant.vars['screenout_reason'] = 'network_full'  # Flag why they are screened out
                 player.participant.label = p_label
 
 class CapacityScreenout(Page):
@@ -339,6 +344,13 @@ class CapacityScreenout(Page):
         is_screened = player.participant.vars.get('screened_out', False)
         is_ghost = player.participant.vars.get('is_ghost', False)
         return player.round_number == 1 and is_screened and not is_ghost
+
+    @staticmethod
+    def vars_for_template(player: Player):
+        # Pass the reason to the frontend template
+        return {
+            'screenout_reason': player.participant.vars.get('screenout_reason', 'unknown')
+        }
 
 class FeedTaskGatekeeper(Page):
     @staticmethod
