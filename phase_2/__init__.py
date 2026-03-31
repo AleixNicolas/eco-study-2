@@ -175,6 +175,7 @@ class Player(BasePlayer):
     screened_out = models.BooleanField(initial=False)
     
     incoming_feed = models.LongStringField(initial="[]", blank=True)
+    current_backlog = models.LongStringField(initial="{}", blank=True)
     outgoing_shares = models.LongStringField(initial="[]", blank=True)
     average_feed_size = models.FloatField(blank=True, null=True)
     max_feed_size = models.IntegerField(blank=True, null=True)
@@ -240,6 +241,8 @@ def generate_feed_for_player(player: Player):
                         backlog[str(item_id)] = backlog.get(str(item_id), 0) + 1
                 except Exception:
                     pass
+                
+    player.current_backlog = json.dumps(backlog)
 
     feed_item_ids = []
     if len(backlog) > 4:
