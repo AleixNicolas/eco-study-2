@@ -1,5 +1,7 @@
 {{ block title }}
-    {{ if player.round_number == 1 }}Welcome to the Experiment{{ else }}Preparing Feed{{ endif }}
+    {{ if player.round_number == 1 }}Welcome to the Experiment
+    {{ elif player.round_number == total_rounds }}Final Round
+    {{ else }}Daily Feed{{ endif }}
 {{ endblock }}
 
 {{ block content }}
@@ -7,33 +9,74 @@
 
 <div class="card shadow-sm p-4 mt-5">
     {{ if player.round_number == 1 }}
-        <h4 class="mb-3 text-primary text-center">Network Assignment Successful!</h4>
-        <p class="lead text-center">You have successfully secured your position as a node in the network.</p>
+        <p class="lead text-center">You have successfully been included in the experiment.</p>
         
         <hr class="my-4">
         
-        <h5>📖 Instructions for the Next 7 Days</h5>
+        <h5>Instructions for today and the next 4 Days</h5>
         <p>Every day, you will be asked to review a short feed of news articles related to the environment.</p>
         <ul>
             <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
             <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
-            <li><strong>Impact:</strong> The articles you choose to share will be pushed directly to the feeds of your connected neighbors in the network.</li>
+            <li><strong>Impact:</strong> The articles you choose will be shared with other participants.</li>
+        </ul>
+        <p>This task should not take more than 2 minutes a day. You may enter at any time during the 24h round.</p>
+        
+        <h5 class="mt-4">Compensation Structure</h5>
+        <ul>
+            <li><strong>Daily Base Pay:</strong> $0.50 for each daily round you complete.</li>
+            <li><strong>Completion Bonus:</strong> An additional $5.00 if you participate in at least 4 out of the 5 rounds (Note: you must complete the final day to be eligible for this bonus).</li>
+            <li><strong>Perfect Attendance Lottery:</strong> If you complete all 5 rounds without missing a single day, you will be entered into a drawing for a $100 grand prize.</li>
         </ul>
         
-        <div class="alert alert-info mt-4 text-center border-info">
-            <strong>Today's Task:</strong> To kickstart the network, your Day 1 feed contains randomly selected articles. Click below to make your initial sharing decisions and receive today's payment!
-        </div>
+    {{ elif player.round_number == total_rounds }}
+        <h4 class="mb-4 text-primary text-center">Welcome to Round {{ player.round_number }} (Final Day)</h4>
+        <p class="text-center">Your feed has been updated with the shares of other participants.</p>
         
+        <hr class="my-3">
+        
+        <h5>Instructions:</h5>
+        <p>Today is the final day. You will be asked to review your last news feed, followed by a short additional survey.</p>
+        <ul>
+            <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
+            <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
+            <li><strong>Impact:</strong> The articles you choose will be shared with other participants.</li>
+        </ul>
+        <p>This final task and survey should not take more than 4 minutes in total. You may enter at any time during the 24h round.</p>
+        
+        <div class="alert alert-light border mt-4">
+            <strong>Today's Reward:</strong> $1.50 upon completion of this feed and the final survey.<br>
+            <small class="text-muted"><em>Reminder: Completing today is mandatory to be eligible for the $5.00 bonus (if you reach 4 total rounds) and the $100 lottery (if you complete all 5).</em></small>
+        </div>
+
     {{ else }}
         <h4 class="mb-4 text-primary text-center">Welcome to Round {{ player.round_number }}</h4>
-        <p class="text-center">Your network feed has been synced with the latest activity from your neighbors.</p>
-        <p class="text-center">Click below to begin today's task.</p>
+        <p class="text-center">Your feed has been updated with the shares of other participants.</p>
+        
+        <hr class="my-3">
+        
+        <h5>Instructions:</h5>
+        <p>Every day, you will be asked to review a short feed of news articles related to the environment.</p>
+        <ul>
+            <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
+            <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
+            <li><strong>Impact:</strong> The articles you choose will be shared with other participants.</li>
+        </ul>
+        <p>This task should not take more than 2 minutes a day. You may enter at any time during the 24h round.</p>
+        
+        <div class="alert alert-light border mt-4">
+            <strong>Today's Reward:</strong> $0.50 upon completion of this feed.<br>
+            <small class="text-muted"><em>Reminder: You need 4 total rounds for the $5.00 bonus, and all 5 rounds to enter the $100 lottery.</em></small>
+        </div>
+        
     {{ endif }}
 </div>
 
 <div class="text-center mt-4 mb-5">
     <button class="btn btn-success btn-lg px-5 otree-btn-next">
-        {{ if player.round_number == 1 }}Begin Initialization Task{{ else }}View Daily Feed{{ endif }}
+        {{ if player.round_number == 1 }}Begin Initialization Task
+        {{ elif player.round_number == total_rounds }}Begin Final Task
+        {{ else }}View Daily Feed{{ endif }}
     </button>
 </div>
 

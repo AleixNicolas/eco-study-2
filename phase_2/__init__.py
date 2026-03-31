@@ -184,16 +184,15 @@ class Player(BasePlayer):
     
     participated_this_round = models.BooleanField(initial=False)
     
-    opinion_1 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
-    opinion_2 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
-    opinion_3 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
-    opinion_4 = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], widget=widgets.RadioSelectHorizontal)
+    opinion_1 = models.IntegerField(choices=[1, 2, 3, 4, 5], widget=widgets.RadioSelectHorizontal)
+    opinion_2 = models.IntegerField(choices=[1, 2, 3, 4, 5], widget=widgets.RadioSelectHorizontal)
+    opinion_3 = models.IntegerField(choices=[1, 2, 3, 4, 5], widget=widgets.RadioSelectHorizontal)
+    opinion_4 = models.IntegerField(choices=[1, 2, 3, 4, 5], widget=widgets.RadioSelectHorizontal)
     
     satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal)
-    clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the daily instructions?", widget=widgets.RadioSelectHorizontal)
-    echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="To what extent did you feel you were in an 'echo chamber'?", widget=widgets.RadioSelectHorizontal)
-    neighbor_similarity = models.IntegerField(choices=[1, 2, 3, 4, 5, 6, 7], label="How similar do you think your network neighbors' opinions were to your own?", widget=widgets.RadioSelectHorizontal)
-    final_comments = models.LongStringField(label="Comments or questions regarding the experiment.", blank=True)
+    clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the instructions?", widget=widgets.RadioSelectHorizontal)
+    echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
+    final_comments = models.LongStringField(label="Please include any feedback or concerns you may have.", blank=True)
 
 def get_status_vars(player: Player):
     all_rounds = player.in_all_rounds()
@@ -305,7 +304,7 @@ class ArrivalGatekeeper(Page):
             for p in player.in_all_rounds():
                 p.screened_out = True
             player.participant.vars['screened_out'] = True
-            player.participant.vars['screenout_reason'] = 'invalid_id'  # Flag why they are screened out
+            player.participant.vars['screenout_reason'] = 'invalid_id'
             return 
 
         data = Constants.MAPPING[p_label]
@@ -335,7 +334,7 @@ class ArrivalGatekeeper(Page):
                 for p in player.in_all_rounds():
                     p.screened_out = True
                 player.participant.vars['screened_out'] = True 
-                player.participant.vars['screenout_reason'] = 'network_full'  # Flag why they are screened out
+                player.participant.vars['screenout_reason'] = 'network_full'
                 player.participant.label = p_label
 
 class CapacityScreenout(Page):
@@ -347,7 +346,6 @@ class CapacityScreenout(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        # Pass the reason to the frontend template
         return {
             'screenout_reason': player.participant.vars.get('screenout_reason', 'unknown')
         }
@@ -409,7 +407,7 @@ class FinalOpinions(Page):
 
 class FinalFeedback(Page):
     form_model = 'player'
-    form_fields = ['satisfaction', 'clarity', 'echo_chamber', 'neighbor_similarity', 'final_comments']
+    form_fields = ['satisfaction', 'clarity', 'echo_chamber', 'final_comments']
     
     @staticmethod
     def is_displayed(player: Player):
@@ -426,11 +424,11 @@ class EndOfDayWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        code = "DAILY_WAVE_CODE" 
+        daily_url = "https://app.prolific.com/submissions/complete?cc=DAILY_WAVE_CODE" 
         target = calculate_deadline(player.round_number)
             
         vars_dict = {
-            'prolific_daily_code': code,
+            'prolific_daily_url': daily_url,
             'next_round_timestamp': target.isoformat()
         }
         vars_dict.update(get_status_vars(player))

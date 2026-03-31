@@ -4,23 +4,20 @@
         <strong>Total Completed:</strong> <span class="badge bg-dark" style="font-size: 1rem;">{{ completed_total }}</span>
     </div>
     <div class="d-flex align-items-center justify-content-center" style="gap: 15px;">
+        
+        {{ if shield_active }}
         <div class="text-center">
-            {{ if shield_active }}
-                <span style="font-size: 1.5rem;" title="Shield Intact">🛡️</span>
-                <div style="font-size: 0.7rem;" class="text-success">Shield Active</div>
-            {{ else }}
-                <span style="font-size: 1.5rem; opacity: 0.3;" title="Shield Broken">🛡️</span>
-                <div style="font-size: 0.7rem;" class="text-danger">Shield Broken</div>
-            {{ endif }}
+            <span style="font-size: 1.5rem;" title="Perfect Attendance: Lottery Eligible">🎟️</span>
+            <div style="font-size: 0.75rem;" class="text-success fw-bold">$100 Lottery Eligible</div>
         </div>
+        {{ endif }}
+
+        {{ if chest_active }}
         <div class="text-center">
-            {{ if chest_active }}
-                <span style="font-size: 1.5rem;" title="{{ bonus_amount }} Bonus Secured">🧰</span>
-                <div style="font-size: 0.7rem;" class="text-success">{{ bonus_amount }} Secured</div>
-            {{ else }}
-                <span style="font-size: 1.5rem; opacity: 0.3;" title="Bonus Lost">🧰</span>
-                <div style="font-size: 0.7rem;" class="text-danger">Bonus Lost</div>
-            {{ endif }}
+            <span style="font-size: 1.5rem;" title="On track for Completion Bonus">💰</span>
+            <div style="font-size: 0.75rem;" class="text-success fw-bold">{{ bonus_amount }} Bonus Eligible</div>
         </div>
+        {{ endif }}
+        
     </div>
 </div>

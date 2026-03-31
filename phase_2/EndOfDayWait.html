@@ -15,9 +15,13 @@
     </div>
 
     <div class="alert alert-info mt-4">
-        <strong>Return to Prolific:</strong> Use the code <b>{{ prolific_daily_code }}</b> to receive your daily payment.
-        <br>
-        <small class="text-muted">You will be automatically advanced to the next task when the time arrives.</small>
+        <strong>Today's Task Complete!</strong> Please click the button below to return to Prolific and receive your daily payment.
+        
+        <div class="text-center mt-4 mb-2">
+            <a href="{{ prolific_daily_url }}" class="btn btn-primary btn-lg px-5">Return to Prolific</a>
+        </div>
+        
+        <small class="text-muted d-block text-center mt-3">You will be automatically advanced to the next task when the time arrives.</small>
     </div>
 
     <div style="display: none;">
@@ -27,7 +31,9 @@
 
 <script>
     const targetDate = new Date("{{ next_round_timestamp }}");
-    document.getElementById("local-time-display").innerText = targetDate.toLocaleString();
+    document.getElementById("local-time-display").innerText = targetDate.toLocaleString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+    });
 
     setInterval(function() {
         const now = new Date().getTime();
