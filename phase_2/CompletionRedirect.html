@@ -32,6 +32,13 @@
     {{ if lottery_eligible }}
     <div class="alert alert-success mt-3 text-center shadow-sm">
         🎉 <strong>Perfect Attendance!</strong> Because you missed 0 days, you have been entered into the final lottery drawing.
+        
+        <hr class="my-3">
+        <p class="mb-1 text-dark">Your secure, anonymous lottery ticket number is:</p>
+        <h3 class="mb-3" style="font-family: monospace; letter-spacing: 2px;"><strong>{{ lottery_ticket }}</strong></h3>
+        <p class="small text-muted mb-0">
+            <em>Please note: The official draw will be conducted via random.org. It may take a couple of days after the study fully closes for the winning code to be drawn and the £80 bonus to be distributed to the winner.</em>
+        </p>
     </div>
     {{ endif }}
 

@@ -9,45 +9,48 @@
 
 <div class="card shadow-sm p-4 mt-5">
     {{ if player.round_number == 1 }}
-        <p class="lead text-center">You have successfully been included in the experiment.</p>
+        <h4 class="mb-4 text-primary text-center">You have successfully enrolled in the study.</h4>
         
         <hr class="my-4">
         
-        <h5>Instructions for today and the next 4 Days</h5>
-        <p>Every day, you will be asked to review a short feed of news articles related to the environment.</p>
+        <h5>What you will do</h5>
+        <p>For 5 days, you will complete one short daily task about environmental news.<br>In each daily round:</p>
         <ul>
-            <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
-            <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
-            <li><strong>Impact:</strong> The articles you choose will be shared with other participants.</li>
+            <li>Read the headlines.</li>
+            <li>Click <strong>Read More</strong> to view the full summary if needed.</li>
+            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong> based on whether you think the article is worth sharing. <em>(You can share anywhere from 0 to all 4 articles).</em></li>
         </ul>
-        <p>This task should not take more than 2 minutes a day. You may enter at any time during the 24h round.</p>
+        <p>Articles you choose to share may be shown to other participants.</p>
+        <p>Each daily round takes about 2 minutes. You can complete each round at any time during its 24-hour window.</p>
         
-        <h5 class="mt-4">Compensation Structure</h5>
+        <h5 class="mt-4">Payment</h5>
         <ul>
-            <li><strong>Daily Base Pay:</strong> $0.50 for each daily round you complete.</li>
-            <li><strong>Completion Bonus:</strong> An additional $5.00 if you participate in at least 4 out of the 5 rounds (Note: you must complete the final day to be eligible for this bonus).</li>
-            <li><strong>Perfect Attendance Lottery:</strong> If you complete all 5 rounds without missing a single day, you will be entered into a drawing for a $100 grand prize.</li>
+            <li><strong>Daily payment:</strong> £0.40 (approx. $0.50) for each completed round</li>
+            <li><strong>Completion bonus:</strong> £4.00 (approx. $5.00) if you complete at least 4 of the 5 rounds <em>and</em> complete the final round</li>
+            <li><strong>Perfect attendance lottery:</strong> If you complete all 5 rounds, you will be entered into a drawing for an £80.00 (approx. $100.00) prize</li>
         </ul>
         
     {{ elif player.round_number == total_rounds }}
-        <h4 class="mb-4 text-primary text-center">Welcome to Round {{ player.round_number }} (Final Day)</h4>
+        <h4 class="mb-4 text-primary text-center">Welcome to the Final Round</h4>
         <p class="text-center">Your feed has been updated with the shares of other participants.</p>
         
         <hr class="my-3">
         
-        <h5>Instructions:</h5>
-        <p>Today is the final day. You will be asked to review your last news feed, followed by a short additional survey.</p>
+        <h5>What you will do</h5>
+        <p>Today is the final day. You will complete your last daily task about environmental news, followed by a short final survey.<br>In today's round:</p>
         <ul>
-            <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
-            <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
-            <li><strong>Impact:</strong> The articles you choose will be shared with other participants.</li>
+            <li>Read the headlines.</li>
+            <li>Click <strong>Read More</strong> to view the full summary if needed.</li>
+            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong> based on whether you think the article is worth sharing. <em>(You can share anywhere from 0 to all 4 articles).</em></li>
         </ul>
-        <p>This final task and survey should not take more than 4 minutes in total. You may enter at any time during the 24h round.</p>
+        <p>Articles you choose to share may be shown to other participants.</p>
+        <p>This final task and survey should not take more than 6 minutes in total. You can complete it at any time during its 24-hour window.</p>
         
         <div class="alert alert-light border mt-4">
-            <strong>Today's Reward:</strong> $1.50 upon completion of this feed and the final survey.<br>
-            <small class="text-muted"><em>Reminder: Completing today is mandatory to be eligible for the $5.00 bonus (if you reach 4 total rounds) and the $100 lottery (if you complete all 5).</em></small>
+            <strong>Today's Payment:</strong> £1.20 (approx. $1.50) upon completion of this feed and the final survey.<br>
+            <small class="text-muted"><em>Reminder: Completing today is mandatory to be eligible for the £4.00 (approx. $5.00) bonus (if you reach 4 total rounds) and the £80.00 (approx. $100.00) lottery (if you complete all 5).</em></small>
         </div>
+
 
     {{ else }}
         <h4 class="mb-4 text-primary text-center">Welcome to Round {{ player.round_number }}</h4>
@@ -55,18 +58,19 @@
         
         <hr class="my-3">
         
-        <h5>Instructions:</h5>
-        <p>Every day, you will be asked to review a short feed of news articles related to the environment.</p>
+        <h5>What you will do</h5>
+        <p>You will complete your daily task about environmental news.<br>In today's round:</p>
         <ul>
-            <li><strong>Review:</strong> Read the headlines. You can click "Read More" to see the full summary.</li>
-            <li><strong>Decide:</strong> For each article, choose whether to <strong>Share</strong> it or <strong>Not Share</strong> it.</li>
-            <li><strong>Impact:</strong> The articles you choose will be shared with other participants.</li>
+            <li>Read the headlines.</li>
+            <li>Click <strong>Read More</strong> to view the full summary if needed.</li>
+            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong> based on whether you think the article is worth sharing. <em>(You can share anywhere from 0 to all 4 articles).</em></li>
         </ul>
-        <p>This task should not take more than 2 minutes a day. You may enter at any time during the 24h round.</p>
+        <p>Articles you choose to share may be shown to other participants.</p>
+        <p>This task takes about 2 minutes. You can complete it at any time during its 24-hour window.</p>
         
         <div class="alert alert-light border mt-4">
-            <strong>Today's Reward:</strong> $0.50 upon completion of this feed.<br>
-            <small class="text-muted"><em>Reminder: You need 4 total rounds for the $5.00 bonus, and all 5 rounds to enter the $100 lottery.</em></small>
+            <strong>Today's Payment:</strong> £0.40 (approx. $0.50) upon completion of this feed.<br>
+            <small class="text-muted"><em>Reminder: You need 4 total rounds for the £4.00 (approx. $5.00) bonus, and all 5 rounds to enter the £80.00 (approx. $100.00) lottery.</em></small>
         </div>
         
     {{ endif }}
@@ -74,7 +78,7 @@
 
 <div class="text-center mt-4 mb-5">
     <button class="btn btn-success btn-lg px-5 otree-btn-next">
-        {{ if player.round_number == 1 }}Begin Initialization Task
+        {{ if player.round_number == 1 }}Begin Task
         {{ elif player.round_number == total_rounds }}Begin Final Task
         {{ else }}View Daily Feed{{ endif }}
     </button>

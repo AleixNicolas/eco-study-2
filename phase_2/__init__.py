@@ -19,9 +19,10 @@ class Constants(BaseConstants):
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
-    PAY_PER_ROUND = 0.50
-    FINAL_ROUND_PAY = 1.50
-    BONUS_AMOUNT = 5.00
+    PAY_PER_ROUND = 0.40    # 2 mins @ £0.20/min
+    FINAL_ROUND_PAY = 1.20  # 6 mins @ £0.20/min
+    BONUS_AMOUNT = 4.00
+    LOTTERY_AMOUNT = 80.00
     MAX_ALLOWED_MISSES = 1
     
     json_path = os.path.join(os.path.dirname(__file__), 'network_map.json')
@@ -208,13 +209,15 @@ def get_status_vars(player: Player):
     shield_active = missed_rounds_start <= 0
     chest_active = missed_rounds_start <= Constants.MAX_ALLOWED_MISSES
     
+    usd_bonus_approx = Constants.BONUS_AMOUNT * 1.25
+    
     return {
         'current_round': player.round_number,
         'total_rounds': Constants.num_rounds,
         'completed_total': completed_total,
         'shield_active': shield_active,
         'chest_active': chest_active,
-        'bonus_amount': f"${Constants.BONUS_AMOUNT:.2f}"
+        'bonus_amount': f"£{Constants.BONUS_AMOUNT:.2f} (approx. ${usd_bonus_approx:.2f})"
     }
 
 # --- STANDALONE FEED GENERATOR ---
@@ -427,7 +430,20 @@ class EndOfDayWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        daily_url = "https://app.prolific.com/submissions/complete?cc=DAILY_WAVE_CODE" 
+        # 1. Fetch the JSON string from Heroku (defaults to empty brackets if not found)
+        codes_json = os.environ.get('PROLIFIC_DAILY_CODES', '{}')
+        
+        # 2. Safely parse it
+        try:
+            daily_codes = json.loads(codes_json)
+        except json.JSONDecodeError:
+            daily_codes = {}
+            
+        # 3. Look up the code. (JSON keys are always strings, so we wrap round_number in str())
+        current_code = daily_codes.get(str(player.round_number), "MISSING_CODE")
+        
+        daily_url = f"https://app.prolific.com/submissions/complete?cc={current_code}"
+        
         target = calculate_deadline(player.round_number)
             
         vars_dict = {
@@ -455,14 +471,19 @@ class CompletionRedirect(Page):
         lottery_eligible = (missed_rounds == 0)
         completion_url = player.session.config.get('completion_url', '')
         
+        usd_base_approx = final_base_pay * 1.25
+        usd_bonus_approx = bonus * 1.25
+        usd_total_approx = total_final_payment * 1.25
+        
         vars_dict = {
             'completed_rounds': completed_rounds,
-            'final_base_pay': f"${final_base_pay:.2f}",
-            'final_bonus_amount': f"${bonus:.2f}",
-            'total_final_payment': f"${total_final_payment:.2f}",
+            'final_base_pay': f"£{final_base_pay:.2f} (approx. ${usd_base_approx:.2f})",
+            'final_bonus_amount': f"£{bonus:.2f} (approx. ${usd_bonus_approx:.2f})",
+            'total_final_payment': f"£{total_final_payment:.2f} (approx. ${usd_total_approx:.2f})",
             'earned_bonus': bonus > 0,
             'lottery_eligible': lottery_eligible,
-            'completion_url': completion_url
+            'completion_url': completion_url,
+            'lottery_ticket': player.participant.code.upper() # Captures the secure oTree ID
         }
         vars_dict.update(get_status_vars(player))
         return vars_dict
