@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 doc = """
 Phase 2: 8-Day Asynchronous Network Experiment.
 Configurable via Heroku Config Vars. Manual Advancement enabled.
+Supports simultaneous multi-network runs via Dynamic Load Balancing.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -17,6 +18,7 @@ class Constants(BaseConstants):
     name_in_url = 'phase_2'
     
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
+    # Note: If running 'both', this should be the TOTAL capacity (e.g. 40)
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.40    # 2 mins @ £0.20/min
@@ -28,10 +30,9 @@ class Constants(BaseConstants):
     json_path = os.path.join(os.path.dirname(__file__), 'network_map.json')
     if os.path.exists(json_path):
         with open(json_path, encoding='utf-8') as f:
-            raw_network = json.load(f)
-            NETWORK = {int(k): v for k, v in raw_network.items()}
+            NETWORK_DATA = json.load(f)
     else:
-        NETWORK = {}
+        NETWORK_DATA = {}
 
     csv_path = os.path.join(os.path.dirname(__file__), 'news_items.csv')
     if os.path.exists(csv_path):
@@ -42,7 +43,6 @@ class Constants(BaseConstants):
 
     mapping_data = os.environ.get('PARTICIPANT_MAPPING')
     if mapping_data:
-        # Strip invisible formatting characters that cause JSON parsing to fail
         clean_data = mapping_data.replace('\xa0', ' ').replace('\u200b', '').strip()
         try:
             MAPPING = json.loads(clean_data)
@@ -60,7 +60,6 @@ class Constants(BaseConstants):
     }
 
 def calculate_deadline(round_number):
-    """Calculates the deadline timestamp for a given round based on Config Vars."""
     base_time_str = os.environ.get('NETWORK_DAILY_START_HOUR_UTC', '2026-03-23T16:15:00')
     try:
         base_time = datetime.strptime(base_time_str, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
@@ -84,20 +83,42 @@ def creating_session(subsession: Subsession):
         mode = os.environ.get('NETWORK_MODE', 'segregated').lower()
         subsession.session.vars['network_mode'] = mode
 
-        network_size = Constants.players_per_group
-        all_nodes = list(range(1, network_size + 1))
-        half = network_size // 2
+        # --- DYNAMIC 4-QUEUE ROUTING FOR SIMULTANEOUS RUNS ---
+        if mode == 'both' and Constants.NETWORK_DATA:
+            seg_high, seg_low, int_high, int_low = [], [], [], []
 
-        if mode == 'segregated':
-            high_nodes = list(range(1, half + 1))
-            low_nodes = list(range(half + 1, network_size + 1))
+            seg_nodes = Constants.NETWORK_DATA.get('segregated_baseline', {}).get('nodes', {})
+            for n_id_str, data in seg_nodes.items():
+                if data['opinion'] < 0.5: 
+                    seg_high.append(int(n_id_str))
+                else:
+                    seg_low.append(int(n_id_str))
+
+            int_nodes = Constants.NETWORK_DATA.get('integrated_baseline', {}).get('nodes', {})
+            for n_id_str, data in int_nodes.items():
+                if data['opinion'] < 0.5:
+                    int_high.append(int(n_id_str))
+                else:
+                    int_low.append(int(n_id_str))
+
+            subsession.session.vars['queue_seg_high'] = seg_high
+            subsession.session.vars['queue_seg_low'] = seg_low
+            subsession.session.vars['queue_int_high'] = int_high
+            subsession.session.vars['queue_int_low'] = int_low
+            
+        # --- FALLBACK: SINGLE NETWORK RUNS ---
         else:
-            random.shuffle(all_nodes)
-            high_nodes = all_nodes[:half]
-            low_nodes = all_nodes[half:]
+            network_size = Constants.players_per_group
+            all_nodes = list(range(0, network_size))
+            half = network_size // 2
 
-        subsession.session.vars['available_high_nodes'] = high_nodes
-        subsession.session.vars['available_low_nodes'] = low_nodes
+            if mode == 'segregated':
+                subsession.session.vars['available_high_nodes'] = list(range(0, half))
+                subsession.session.vars['available_low_nodes'] = list(range(half, network_size))
+            else:
+                random.shuffle(all_nodes)
+                subsession.session.vars['available_high_nodes'] = all_nodes[:half]
+                subsession.session.vars['available_low_nodes'] = all_nodes[half:]
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
@@ -108,63 +129,73 @@ def vars_for_admin_report(subsession: Subsession):
     avg_opinion_change = {}
     sort_order = {"Far Left": 1, "Left": 2, "Lean Left": 3, "Center": 4, "Lean Right": 5, "Right": 6, "Far Right": 7, "Unknown": 8}
     
-    for cat in ['High_Concern', 'Low_Concern']:
-        cat_players = [p for p in valid_players if p.participant.vars.get('assigned_category') == cat]
-        leaning_counts = {}
-        total_articles = 0
-        
-        for p in cat_players:
-            for p_round in p.in_all_rounds():
-                feed_data = p_round.field_maybe_none('incoming_feed')
-                if feed_data:
-                    try:
-                        feed = json.loads(feed_data)
-                        for item in feed:
-                            lean = item.get('leaning', 'Unknown')
-                            leaning_counts[lean] = leaning_counts.get(lean, 0) + 1
-                            total_articles += 1
-                    except Exception:
-                        pass
-                        
-        lean_pcts = {}
-        if total_articles > 0:
-            for lean, count in leaning_counts.items():
-                lean_pcts[lean] = round((count / total_articles) * 100, 1)
-        else:
-            lean_pcts['No Data Yet'] = 0
-            
-        sorted_lean_pcts = {k: v for k, v in sorted(lean_pcts.items(), key=lambda item: sort_order.get(item[0], 99))}
-        feed_lean_percentages[cat] = sorted_lean_pcts
+    treatments = list(set([p.participant.vars.get('network_treatment', 'segregated') for p in valid_players]))
+    if not treatments:
+        treatments = [os.environ.get('NETWORK_MODE', 'segregated').lower()]
 
-        changes = {'opinion_1': [], 'opinion_2': [], 'opinion_3': [], 'opinion_4': []}
-        for p in cat_players:
-            for i in range(1, 5):
-                baseline = p.participant.vars.get(f'baseline_opinion_{i}')
-                final_opinion = None
-                for p_round in reversed(p.in_all_rounds()):
-                    val = p_round.field_maybe_none(f'opinion_{i}')
-                    if val is not None:
-                        final_opinion = val
-                        break
-                
-                if baseline is not None and final_opinion is not None:
-                    try:
-                        changes[f'opinion_{i}'].append(int(final_opinion) - int(baseline))
-                    except ValueError:
-                        pass
-                        
-        avg_change = {}
-        for key, value_list in changes.items():
-            if value_list:
-                avg_change[key] = round(sum(value_list) / len(value_list), 2)
+    for treatment in treatments:
+        t_players = [p for p in valid_players if p.participant.vars.get('network_treatment', 'segregated') == treatment]
+        feed_lean_percentages[treatment] = {}
+        avg_opinion_change[treatment] = {}
+        
+        for cat in ['High_Concern', 'Low_Concern']:
+            cat_players = [p for p in t_players if p.participant.vars.get('assigned_category') == cat]
+            leaning_counts = {}
+            total_articles = 0
+            
+            for p in cat_players:
+                for p_round in p.in_all_rounds():
+                    feed_data = p_round.field_maybe_none('incoming_feed')
+                    if feed_data:
+                        try:
+                            feed = json.loads(feed_data)
+                            for item in feed:
+                                lean = item.get('leaning', 'Unknown')
+                                leaning_counts[lean] = leaning_counts.get(lean, 0) + 1
+                                total_articles += 1
+                        except Exception:
+                            pass
+                            
+            lean_pcts = {}
+            if total_articles > 0:
+                for lean, count in leaning_counts.items():
+                    lean_pcts[lean] = round((count / total_articles) * 100, 1)
             else:
-                avg_change[key] = "N/A"
+                lean_pcts['No Data Yet'] = 0
                 
-        avg_opinion_change[cat] = avg_change
+            sorted_lean_pcts = {k: v for k, v in sorted(lean_pcts.items(), key=lambda item: sort_order.get(item[0], 99))}
+            feed_lean_percentages[treatment][cat] = sorted_lean_pcts
+
+            changes = {'opinion_1': [], 'opinion_2': [], 'opinion_3': [], 'opinion_4': []}
+            for p in cat_players:
+                for i in range(1, 5):
+                    baseline = p.participant.vars.get(f'baseline_opinion_{i}')
+                    final_opinion = None
+                    for p_round in reversed(p.in_all_rounds()):
+                        val = p_round.field_maybe_none(f'opinion_{i}')
+                        if val is not None:
+                            final_opinion = val
+                            break
+                    
+                    if baseline is not None and final_opinion is not None:
+                        try:
+                            changes[f'opinion_{i}'].append(int(final_opinion) - int(baseline))
+                        except ValueError:
+                            pass
+                            
+            avg_change = {}
+            for key, value_list in changes.items():
+                if value_list:
+                    avg_change[key] = round(sum(value_list) / len(value_list), 2)
+                else:
+                    avg_change[key] = "N/A"
+                    
+            avg_opinion_change[treatment][cat] = avg_change
 
     return {
         'total_players': total_players,
         'network_size': Constants.players_per_group,
+        'treatments': treatments,
         'feed_lean_percentages': feed_lean_percentages,
         'avg_opinion_change': avg_opinion_change
     }
@@ -176,6 +207,7 @@ class Player(BasePlayer):
     prolific_id = models.StringField(blank=True)
     node_id = models.IntegerField(blank=True, null=True)
     category = models.StringField(blank=True) 
+    network_treatment = models.StringField(blank=True)
     screened_out = models.BooleanField(initial=False)
     
     incoming_feed = models.LongStringField(initial="[]", blank=True)
@@ -235,14 +267,31 @@ def generate_feed_for_player(player: Player):
     backlog = player.participant.vars.get('backlog', {})
     shared_history = player.participant.vars.get('shared_history', set())
     
+    # Check individual treatment, not the global mode
+    treatment = player.participant.vars.get('network_treatment', 'segregated')
+    baseline_key = f"{treatment}_baseline"
+    node_str = str(player.node_id)
+    node_int = player.node_id
+
+    neighbors = []
+    starting_items = []
+
+    if baseline_key in Constants.NETWORK_DATA:
+        baseline_data = Constants.NETWORK_DATA[baseline_key]
+        neighbors = baseline_data.get('network', {}).get(node_str, [])
+        starting_items = baseline_data.get('nodes', {}).get(node_str, {}).get('starting_items', [])
+    else:
+        neighbors = Constants.NETWORK_DATA.get(node_str, Constants.NETWORK_DATA.get(node_int, []))
+    
     new_items = {}
 
     if player.round_number > 1:
         prev_subsession = player.subsession.in_round(player.round_number - 1)
-        neighbors = Constants.NETWORK.get(player.node_id, [])
-        prev_players = prev_subsession.get_players()
         
-        # 1. Add items shared by this player in the previous round to shared_history
+        # --- THE FIREWALL ---
+        # Only grab players from the PREVIOUS round that are in the SAME treatment network
+        prev_players = [p for p in prev_subsession.get_players() if p.participant.vars.get('network_treatment') == treatment]
+        
         this_player_prev = next((p for p in prev_players if p.participant.vars.get('node_id') == player.node_id), None)
         if this_player_prev and this_player_prev.field_maybe_none('outgoing_shares'):
             try:
@@ -253,7 +302,6 @@ def generate_feed_for_player(player: Player):
                 pass
         player.participant.vars['shared_history'] = shared_history
 
-        # 2. Gather new incoming shares from neighbors
         for n_id in neighbors:
             n_player = next((p for p in prev_players if p.participant.vars.get('node_id') == n_id), None)
             if n_player and n_player.field_maybe_none('outgoing_shares'):
@@ -261,53 +309,47 @@ def generate_feed_for_player(player: Player):
                     n_shares = json.loads(n_player.outgoing_shares)
                     for item_id in n_shares:
                         str_id = str(item_id)
-                        # Hide shared logic: do not add to pool if previously shared
                         if str_id not in shared_history:
                             new_items[str_id] = new_items.get(str_id, 0) + 1
                 except Exception:
                     pass
                     
-    # Clean the existing backlog of any items they just shared last round
     backlog = {k: v for k, v in backlog.items() if k not in shared_history}
-
     feed_item_ids = []
 
-    # --- TIER 1: Prioritize new incoming items ---
-    pool_new = list(new_items.keys())
-    weights_new = [new_items[k] for k in pool_new]
-    
-    while len(feed_item_ids) < 4 and pool_new:
-        choice = random.choices(pool_new, weights=weights_new, k=1)[0]
-        feed_item_ids.append(choice)
-        idx = pool_new.index(choice)
-        pool_new.pop(idx)
-        weights_new.pop(idx)
+    if player.round_number == 1 and starting_items:
+        feed_item_ids = [str(item) for item in starting_items]
+    else:
+        pool_new = list(new_items.keys())
+        weights_new = [new_items[k] for k in pool_new]
         
-    # --- TIER 2: If we still need items, pull from the older backlog ---
-    if len(feed_item_ids) < 4:
-        pool_old = list(backlog.keys())
-        weights_old = [backlog[k] for k in pool_old]
-        while len(feed_item_ids) < 4 and pool_old:
-            choice = random.choices(pool_old, weights=weights_old, k=1)[0]
+        while len(feed_item_ids) < 4 and pool_new:
+            choice = random.choices(pool_new, weights=weights_new, k=1)[0]
             feed_item_ids.append(choice)
-            idx = pool_old.index(choice)
-            pool_old.pop(idx)
-            weights_old.pop(idx)
-    
-    # Merge any unselected new items into the backlog for future rounds
-    for k, v in new_items.items():
-        backlog[k] = backlog.get(k, 0) + v
+            idx = pool_new.index(choice)
+            pool_new.pop(idx)
+            weights_new.pop(idx)
+            
+        if len(feed_item_ids) < 4:
+            pool_old = list(backlog.keys())
+            weights_old = [backlog[k] for k in pool_old]
+            while len(feed_item_ids) < 4 and pool_old:
+                choice = random.choices(pool_old, weights=weights_old, k=1)[0]
+                feed_item_ids.append(choice)
+                idx = pool_old.index(choice)
+                pool_old.pop(idx)
+                weights_old.pop(idx)
         
-    # Remove selected feed items from the backlog
+        for k, v in new_items.items():
+            backlog[k] = backlog.get(k, 0) + v
+
     for item_id in feed_item_ids:
         if item_id in backlog:
             del backlog[item_id]
 
-    # --- TIER 3: Pad with random items if feed size is still below 4 ---
     if len(feed_item_ids) < 4:
         needed = 4 - len(feed_item_ids)
         all_ids = [str(item.get('id', '')) for item in Constants.NEWS_ITEMS]
-        # Exclude already selected items AND items in shared_history
         available_pool = [i for i in all_ids if i not in feed_item_ids and i not in shared_history and i != '']
         if available_pool:
             padding_items = random.sample(available_pool, min(needed, len(available_pool)))
@@ -323,7 +365,6 @@ def generate_feed_for_player(player: Player):
             feed_items.append(item_data)
             
     player.incoming_feed = json.dumps(feed_items)
-
 
 # --- PAGES ---
 
@@ -352,7 +393,6 @@ class ArrivalGatekeeper(Page):
         for p in player.in_all_rounds():
             p.prolific_id = p_label
         
-        # --- STRICT MAPPING ENFORCEMENT ---
         if p_label not in Constants.MAPPING:
             for p in player.in_all_rounds():
                 p.screened_out = True
@@ -370,17 +410,40 @@ class ArrivalGatekeeper(Page):
 
         with SYSTEM_LOCK:
             assigned_node = None
-            if cat == 'High_Concern' and player.session.vars['available_high_nodes']:
-                assigned_node = player.session.vars['available_high_nodes'].pop(0)
-            elif cat == 'Low_Concern' and player.session.vars['available_low_nodes']:
-                assigned_node = player.session.vars['available_low_nodes'].pop(0)
+            assigned_treatment = None
+            mode = player.session.vars.get('network_mode', 'segregated')
+
+            # --- DYNAMIC LOAD BALANCER ---
+            if mode == 'both':
+                if cat == 'High_Concern':
+                    q_seg = player.session.vars['queue_seg_high']
+                    q_int = player.session.vars['queue_int_high']
+                else:
+                    q_seg = player.session.vars['queue_seg_low']
+                    q_int = player.session.vars['queue_int_low']
+
+                if len(q_seg) > 0 or len(q_int) > 0:
+                    if len(q_seg) >= len(q_int) and len(q_seg) > 0:
+                        assigned_node = q_seg.pop(0)
+                        assigned_treatment = 'segregated'
+                    elif len(q_int) > 0:
+                        assigned_node = q_int.pop(0)
+                        assigned_treatment = 'integrated'
+            else:
+                assigned_treatment = mode
+                if cat == 'High_Concern' and player.session.vars['available_high_nodes']:
+                    assigned_node = player.session.vars['available_high_nodes'].pop(0)
+                elif cat == 'Low_Concern' and player.session.vars['available_low_nodes']:
+                    assigned_node = player.session.vars['available_low_nodes'].pop(0)
 
             if assigned_node is not None:
                 for p in player.in_all_rounds():
                     p.node_id = assigned_node
                     p.category = cat
+                    p.network_treatment = assigned_treatment
                     p.screened_out = False
                 player.participant.vars['node_id'] = assigned_node
+                player.participant.vars['network_treatment'] = assigned_treatment
                 player.participant.vars['screened_out'] = False 
                 player.participant.label = p_label
             else:
