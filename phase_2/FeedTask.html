@@ -95,12 +95,12 @@
                     <div class="compact-decision">
                         <div class="controls">
                             <div class="form-check">
-                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="${item.id}" id="share_${index}">
-                                <label class="form-check-label" for="share_${index}">Share</label>
+                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="${item.id}" id="share_${index}" disabled>
+                                <label class="form-check-label text-muted" for="share_${index}" id="label_share_${index}">Share</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="Not Share" id="not_share_${index}">
-                                <label class="form-check-label" for="not_share_${index}">Not Share</label>
+                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="Not Share" id="not_share_${index}" disabled>
+                                <label class="form-check-label text-muted" for="not_share_${index}" id="label_not_share_${index}">Not Share</label>
                             </div>
                         </div>
                     </div>
@@ -127,6 +127,12 @@
                 mobileContent.style.display = 'block';
             }
         }
+
+        // Enable the radio buttons for this specific item once read
+        document.getElementById(`share_${index}`).disabled = false;
+        document.getElementById(`not_share_${index}`).disabled = false;
+        document.getElementById(`label_share_${index}`).classList.remove('text-muted');
+        document.getElementById(`label_not_share_${index}`).classList.remove('text-muted');
     }
 
     setInterval(() => {
@@ -151,7 +157,7 @@
         }
 
         if (missingDecision) {
-            alert("Please select 'Share' or 'Not Share' for every article before completing the round.");
+            alert("Please select 'Share' or 'Not Share' for every article before completing the round. Make sure you click 'Read More' to unlock the choices.");
             return;
         }
 

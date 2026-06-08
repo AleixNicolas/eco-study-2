@@ -230,25 +230,78 @@ def generate_feed_for_player(player: Player):
     player.prolific_id = player.participant.vars.get('prolific_id', '')
 
     backlog = player.participant.vars.get('backlog', {})
+    shared_history = player.participant.vars.get('shared_history', set())
+    
+    new_items = {}
 
     if player.round_number > 1:
         prev_subsession = player.subsession.in_round(player.round_number - 1)
         neighbors = Constants.NETWORK.get(player.node_id, [])
         prev_players = prev_subsession.get_players()
+        
+        # 1. Add items shared by this player in the previous round to shared_history
+        this_player_prev = next((p for p in prev_players if p.participant.vars.get('node_id') == player.node_id), None)
+        if this_player_prev and this_player_prev.field_maybe_none('outgoing_shares'):
+            try:
+                shares = json.loads(this_player_prev.outgoing_shares)
+                for item_id in shares:
+                    shared_history.add(str(item_id))
+            except Exception:
+                pass
+        player.participant.vars['shared_history'] = shared_history
+
+        # 2. Gather new incoming shares from neighbors
         for n_id in neighbors:
             n_player = next((p for p in prev_players if p.participant.vars.get('node_id') == n_id), None)
             if n_player and n_player.field_maybe_none('outgoing_shares'):
                 try:
                     n_shares = json.loads(n_player.outgoing_shares)
                     for item_id in n_shares:
-                        backlog[str(item_id)] = backlog.get(str(item_id), 0) + 1
+                        str_id = str(item_id)
+                        # Hide shared logic: do not add to pool if previously shared
+                        if str_id not in shared_history:
+                            new_items[str_id] = new_items.get(str_id, 0) + 1
                 except Exception:
                     pass
-                
-    player.current_backlog = json.dumps(backlog)
+                    
+    # Clean the existing backlog of any items they just shared last round
+    backlog = {k: v for k, v in backlog.items() if k not in shared_history}
 
     feed_item_ids = []
-    if len(backlog) > 4:
+    is_last_round = (player.round_number == Constants.num_rounds)
+
+    if is_last_round:
+        # Prioritize new items for the final round feed
+        pool_new = list(new_items.keys())
+        weights_new = [new_items[k] for k in pool_new]
+        
+        while len(feed_item_ids) < 4 and pool_new:
+            choice = random.choices(pool_new, weights=weights_new, k=1)[0]
+            feed_item_ids.append(choice)
+            idx = pool_new.index(choice)
+            pool_new.pop(idx)
+            weights_new.pop(idx)
+            
+        # If we still need items to reach 4, pull from the older backlog
+        if len(feed_item_ids) < 4:
+            pool_old = list(backlog.keys())
+            weights_old = [backlog[k] for k in pool_old]
+            while len(feed_item_ids) < 4 and pool_old:
+                choice = random.choices(pool_old, weights=weights_old, k=1)[0]
+                feed_item_ids.append(choice)
+                idx = pool_old.index(choice)
+                pool_old.pop(idx)
+                weights_old.pop(idx)
+        
+        # Merge any unselected new items into the backlog 
+        for k, v in new_items.items():
+            backlog[k] = backlog.get(k, 0) + v
+            
+    else:
+        # Standard procedure for non-final rounds: pool them together and sample
+        for k, v in new_items.items():
+            backlog[k] = backlog.get(k, 0) + v
+            
         pool = list(backlog.keys())
         weights = [backlog[k] for k in pool]
         while len(feed_item_ids) < 4 and pool:
@@ -257,22 +310,24 @@ def generate_feed_for_player(player: Player):
             idx = pool.index(choice)
             pool.pop(idx)
             weights.pop(idx)
-    else:
-        feed_item_ids = list(backlog.keys())
 
-    if len(feed_item_ids) < 4:
-        needed = 4 - len(feed_item_ids)
-        all_ids = [str(item.get('id', '')) for item in Constants.NEWS_ITEMS]
-        available_pool = [i for i in all_ids if i not in feed_item_ids and i != '']
-        if available_pool:
-            padding_items = random.sample(available_pool, min(needed, len(available_pool)))
-            feed_item_ids.extend(padding_items)
-
+    # Remove selected feed items from the backlog
     for item_id in feed_item_ids:
         if item_id in backlog:
             del backlog[item_id]
 
+    # Pad with random items if feed size is below 4
+    if len(feed_item_ids) < 4:
+        needed = 4 - len(feed_item_ids)
+        all_ids = [str(item.get('id', '')) for item in Constants.NEWS_ITEMS]
+        # Exclude already selected items AND items in shared_history
+        available_pool = [i for i in all_ids if i not in feed_item_ids and i not in shared_history and i != '']
+        if available_pool:
+            padding_items = random.sample(available_pool, min(needed, len(available_pool)))
+            feed_item_ids.extend(padding_items)
+
     player.participant.vars['backlog'] = backlog
+    player.current_backlog = json.dumps(backlog)
 
     feed_items = []
     for item_id in feed_item_ids:
@@ -281,6 +336,7 @@ def generate_feed_for_player(player: Player):
             feed_items.append(item_data)
             
     player.incoming_feed = json.dumps(feed_items)
+
 
 # --- PAGES ---
 
@@ -430,20 +486,14 @@ class EndOfDayWait(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        # 1. Fetch the JSON string from Heroku (defaults to empty brackets if not found)
         codes_json = os.environ.get('PROLIFIC_DAILY_CODES', '{}')
-        
-        # 2. Safely parse it
         try:
             daily_codes = json.loads(codes_json)
         except json.JSONDecodeError:
             daily_codes = {}
             
-        # 3. Look up the code. (JSON keys are always strings, so we wrap round_number in str())
         current_code = daily_codes.get(str(player.round_number), "MISSING_CODE")
-        
         daily_url = f"https://app.prolific.com/submissions/complete?cc={current_code}"
-        
         target = calculate_deadline(player.round_number)
             
         vars_dict = {
@@ -469,7 +519,16 @@ class CompletionRedirect(Page):
         total_final_payment = final_base_pay + bonus
         
         lottery_eligible = (missed_rounds == 0)
-        completion_url = player.session.config.get('completion_url', '')
+        
+        # Look up the final round's code dynamically from the environment variables
+        codes_json = os.environ.get('PROLIFIC_DAILY_CODES', '{}')
+        try:
+            daily_codes = json.loads(codes_json)
+        except json.JSONDecodeError:
+            daily_codes = {}
+        
+        current_code = daily_codes.get(str(player.round_number), "MISSING_CODE")
+        completion_url = f"https://app.prolific.com/submissions/complete?cc={current_code}"
         
         usd_base_approx = final_base_pay * 1.25
         usd_bonus_approx = bonus * 1.25
@@ -483,7 +542,7 @@ class CompletionRedirect(Page):
             'earned_bonus': bonus > 0,
             'lottery_eligible': lottery_eligible,
             'completion_url': completion_url,
-            'lottery_ticket': player.participant.code.upper() # Captures the secure oTree ID
+            'lottery_ticket': player.participant.code.upper()
         }
         vars_dict.update(get_status_vars(player))
         return vars_dict
