@@ -42,9 +42,12 @@ class Constants(BaseConstants):
 
     mapping_data = os.environ.get('PARTICIPANT_MAPPING')
     if mapping_data:
+        # Strip invisible formatting characters that cause JSON parsing to fail
+        clean_data = mapping_data.replace('\xa0', ' ').replace('\u200b', '').strip()
         try:
-            MAPPING = json.loads(mapping_data)
-        except json.JSONDecodeError:
+            MAPPING = json.loads(clean_data)
+        except json.JSONDecodeError as e:
+            print(f"CRITICAL ERROR PARSING JSON: {e}")
             MAPPING = {}
     else:
         MAPPING = {}
@@ -268,55 +271,39 @@ def generate_feed_for_player(player: Player):
     backlog = {k: v for k, v in backlog.items() if k not in shared_history}
 
     feed_item_ids = []
-    is_last_round = (player.round_number == Constants.num_rounds)
 
-    if is_last_round:
-        # Prioritize new items for the final round feed
-        pool_new = list(new_items.keys())
-        weights_new = [new_items[k] for k in pool_new]
+    # --- TIER 1: Prioritize new incoming items ---
+    pool_new = list(new_items.keys())
+    weights_new = [new_items[k] for k in pool_new]
+    
+    while len(feed_item_ids) < 4 and pool_new:
+        choice = random.choices(pool_new, weights=weights_new, k=1)[0]
+        feed_item_ids.append(choice)
+        idx = pool_new.index(choice)
+        pool_new.pop(idx)
+        weights_new.pop(idx)
         
-        while len(feed_item_ids) < 4 and pool_new:
-            choice = random.choices(pool_new, weights=weights_new, k=1)[0]
+    # --- TIER 2: If we still need items, pull from the older backlog ---
+    if len(feed_item_ids) < 4:
+        pool_old = list(backlog.keys())
+        weights_old = [backlog[k] for k in pool_old]
+        while len(feed_item_ids) < 4 and pool_old:
+            choice = random.choices(pool_old, weights=weights_old, k=1)[0]
             feed_item_ids.append(choice)
-            idx = pool_new.index(choice)
-            pool_new.pop(idx)
-            weights_new.pop(idx)
-            
-        # If we still need items to reach 4, pull from the older backlog
-        if len(feed_item_ids) < 4:
-            pool_old = list(backlog.keys())
-            weights_old = [backlog[k] for k in pool_old]
-            while len(feed_item_ids) < 4 and pool_old:
-                choice = random.choices(pool_old, weights=weights_old, k=1)[0]
-                feed_item_ids.append(choice)
-                idx = pool_old.index(choice)
-                pool_old.pop(idx)
-                weights_old.pop(idx)
+            idx = pool_old.index(choice)
+            pool_old.pop(idx)
+            weights_old.pop(idx)
+    
+    # Merge any unselected new items into the backlog for future rounds
+    for k, v in new_items.items():
+        backlog[k] = backlog.get(k, 0) + v
         
-        # Merge any unselected new items into the backlog 
-        for k, v in new_items.items():
-            backlog[k] = backlog.get(k, 0) + v
-            
-    else:
-        # Standard procedure for non-final rounds: pool them together and sample
-        for k, v in new_items.items():
-            backlog[k] = backlog.get(k, 0) + v
-            
-        pool = list(backlog.keys())
-        weights = [backlog[k] for k in pool]
-        while len(feed_item_ids) < 4 and pool:
-            choice = random.choices(pool, weights=weights, k=1)[0]
-            feed_item_ids.append(choice)
-            idx = pool.index(choice)
-            pool.pop(idx)
-            weights.pop(idx)
-
     # Remove selected feed items from the backlog
     for item_id in feed_item_ids:
         if item_id in backlog:
             del backlog[item_id]
 
-    # Pad with random items if feed size is below 4
+    # --- TIER 3: Pad with random items if feed size is still below 4 ---
     if len(feed_item_ids) < 4:
         needed = 4 - len(feed_item_ids)
         all_ids = [str(item.get('id', '')) for item in Constants.NEWS_ITEMS]
@@ -355,8 +342,12 @@ class ArrivalGatekeeper(Page):
             player.participant.vars['screenout_reason'] = 'timeout'
             return
 
+        raw_label = str(player.participant.label)
+        player.participant.vars['raw_label_seen'] = raw_label
+
         p_label = player.participant.label or f"TEST_USER_{player.id_in_group}"
         player.participant.vars['prolific_id'] = p_label
+        player.participant.vars['processed_label'] = p_label
         
         for p in player.in_all_rounds():
             p.prolific_id = p_label
@@ -409,7 +400,10 @@ class CapacityScreenout(Page):
     @staticmethod
     def vars_for_template(player: Player):
         return {
-            'screenout_reason': player.participant.vars.get('screenout_reason', 'unknown')
+            'screenout_reason': player.participant.vars.get('screenout_reason', 'unknown'),
+            'raw_label': player.participant.vars.get('raw_label_seen', 'None'),
+            'processed_label': player.participant.vars.get('processed_label', 'None'),
+            'dict_keys': str(list(Constants.MAPPING.keys()))
         }
 
 class FeedTaskGatekeeper(Page):
@@ -520,7 +514,6 @@ class CompletionRedirect(Page):
         
         lottery_eligible = (missed_rounds == 0)
         
-        # Look up the final round's code dynamically from the environment variables
         codes_json = os.environ.get('PROLIFIC_DAILY_CODES', '{}')
         try:
             daily_codes = json.loads(codes_json)
