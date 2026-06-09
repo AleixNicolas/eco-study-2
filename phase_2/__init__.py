@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 doc = """
 Phase 2: 8-Day Asynchronous Network Experiment.
-Supports alphanumeric string IDs (e.g., S1-L-1) safely.
+Supports alphanumeric string IDs, Dual-Network Load Balancing, and Strict Queue Logic.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -38,7 +38,6 @@ class Constants(BaseConstants):
             reader = csv.DictReader(f)
             NEWS_ITEMS = []
             for row in reader:
-                # Force keys to lowercase and strip whitespace to prevent header issues
                 clean_row = {str(k).strip().lower() if k else k: v for k, v in row.items()}
                 NEWS_ITEMS.append(clean_row)
     else:
@@ -50,7 +49,6 @@ class Constants(BaseConstants):
         try:
             MAPPING = json.loads(clean_data)
         except json.JSONDecodeError as e:
-            print(f"CRITICAL ERROR PARSING JSON: {e}")
             MAPPING = {}
     else:
         MAPPING = {}
@@ -291,6 +289,7 @@ def generate_feed_for_player(player: Player):
             try:
                 shares = json.loads(this_player_prev.outgoing_shares)
                 for item_id in shares:
+                    # Add to shared_history (The Firewall)
                     shared_history.add(str(item_id).strip().lower())
             except Exception:
                 pass
@@ -303,18 +302,20 @@ def generate_feed_for_player(player: Player):
                     n_shares = json.loads(n_player.outgoing_shares)
                     for item_id in n_shares:
                         str_id = str(item_id).strip().lower()
+                        # Allow passed items to enter from neighbors; block shared items
                         if str_id not in shared_history:
                             new_items[str_id] = new_items.get(str_id, 0) + 1
                 except Exception:
                     pass
                     
-    # Clean up the backlog key matching for alphanumeric string IDs
+    # The Firewall (Rule 2): Annihilate previously shared items from the backlog.
     backlog = {str(k).strip().lower(): v for k, v in backlog.items() if str(k).strip().lower() not in shared_history}
     feed_item_ids = []
 
     if player.round_number == 1 and starting_items:
         feed_item_ids = [str(item).strip().lower() for item in starting_items]
     else:
+        # Tier 1
         pool_new = list(new_items.keys())
         weights_new = [new_items[k] for k in pool_new]
         
@@ -325,9 +326,12 @@ def generate_feed_for_player(player: Player):
             pool_new.pop(idx)
             weights_new.pop(idx)
             
+        # Tier 2
         if len(feed_item_ids) < 4:
-            pool_old = list(backlog.keys())
+            # FIX: Exclude items grabbed by Tier 1 to prevent duplicates on screen
+            pool_old = [k for k in backlog.keys() if k not in feed_item_ids]
             weights_old = [backlog[k] for k in pool_old]
+            
             while len(feed_item_ids) < 4 and pool_old:
                 choice = random.choices(pool_old, weights=weights_old, k=1)[0]
                 feed_item_ids.append(choice)
@@ -335,6 +339,7 @@ def generate_feed_for_player(player: Player):
                 pool_old.pop(idx)
                 weights_old.pop(idx)
         
+        # Merge new items into backlog
         for k, v in new_items.items():
             clean_key = str(k).strip().lower()
             backlog[clean_key] = backlog.get(clean_key, 0) + v
@@ -342,19 +347,18 @@ def generate_feed_for_player(player: Player):
     feed_items = []
     mapped_ids = []
     
-    # Extract structural content with case-insensitive, space-stripped comparisons
     for item_id in feed_item_ids:
         item_data = next((item for item in Constants.NEWS_ITEMS if str(item.get('id', '')).strip().lower() == item_id), None)
         if item_data:
             feed_items.append(item_data)
             mapped_ids.append(item_id)
-        else:
-            print(f"[!] WARNING: Structural ID '{item_id}' requested but not found in news_items.csv")
             
-    # Safety Net: Fall back to randomly selected backup rows if entries are missing
+    # Tier 3 (Padding Net)
     if len(feed_items) < 4:
         needed = 4 - len(feed_items)
         all_ids = [str(item.get('id', '')).strip().lower() for item in Constants.NEWS_ITEMS if item.get('id')]
+        
+        # The Firewall (Rule 2): Exclude items on screen and exclude shared items.
         available_pool = [i for i in all_ids if i not in mapped_ids and i not in shared_history and i != '']
         
         if available_pool:
@@ -365,6 +369,8 @@ def generate_feed_for_player(player: Player):
                     feed_items.append(pad_data)
                     mapped_ids.append(pad_id)
 
+    # --- RULE 1: THE BACKLOG PURGE ---
+    # Wipe items successfully placed on the screen from the backlog memory.
     for item_id in mapped_ids:
         if item_id in backlog:
             del backlog[item_id]
