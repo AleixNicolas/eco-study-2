@@ -289,7 +289,6 @@ def generate_feed_for_player(player: Player):
         prev_subsession = player.subsession.in_round(player.round_number - 1)
         
         # --- THE FIREWALL ---
-        # Only grab players from the PREVIOUS round that are in the SAME treatment network
         prev_players = [p for p in prev_subsession.get_players() if p.participant.vars.get('network_treatment') == treatment]
         
         this_player_prev = next((p for p in prev_players if p.participant.vars.get('node_id') == player.node_id), None)
@@ -314,7 +313,7 @@ def generate_feed_for_player(player: Player):
                 except Exception:
                     pass
                     
-    backlog = {k: v for k, v in backlog.items() if k not in shared_history}
+    backlog = {str(k): v for k, v in backlog.items() if str(k) not in shared_history}
     feed_item_ids = []
 
     if player.round_number == 1 and starting_items:
@@ -341,11 +340,11 @@ def generate_feed_for_player(player: Player):
                 weights_old.pop(idx)
         
         for k, v in new_items.items():
-            backlog[k] = backlog.get(k, 0) + v
+            backlog[str(k)] = backlog.get(str(k), 0) + v
 
     for item_id in feed_item_ids:
-        if item_id in backlog:
-            del backlog[item_id]
+        if str(item_id) in backlog:
+            del backlog[str(item_id)]
 
     if len(feed_item_ids) < 4:
         needed = 4 - len(feed_item_ids)
