@@ -8,8 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 doc = """
 Phase 2: 8-Day Asynchronous Network Experiment.
-Configurable via Heroku Config Vars. Manual Advancement enabled.
-Supports simultaneous multi-network runs via Dynamic Load Balancing.
+Supports alphanumeric string IDs (e.g., S1-L-1) safely.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -18,11 +17,10 @@ class Constants(BaseConstants):
     name_in_url = 'phase_2'
     
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
-    # Note: If running 'both', this should be the TOTAL capacity (e.g. 40)
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
-    PAY_PER_ROUND = 0.40    # 2 mins @ £0.20/min
-    FINAL_ROUND_PAY = 1.20  # 6 mins @ £0.20/min
+    PAY_PER_ROUND = 0.40
+    FINAL_ROUND_PAY = 1.20
     BONUS_AMOUNT = 4.00
     LOTTERY_AMOUNT = 80.00
     MAX_ALLOWED_MISSES = 1
@@ -36,8 +34,13 @@ class Constants(BaseConstants):
 
     csv_path = os.path.join(os.path.dirname(__file__), 'news_items.csv')
     if os.path.exists(csv_path):
-        with open(csv_path, encoding='utf-8') as f:
-            NEWS_ITEMS = list(csv.DictReader(f))
+        with open(csv_path, encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            NEWS_ITEMS = []
+            for row in reader:
+                # Force keys to lowercase and strip whitespace to prevent header issues
+                clean_row = {str(k).strip().lower() if k else k: v for k, v in row.items()}
+                NEWS_ITEMS.append(clean_row)
     else:
         NEWS_ITEMS = []
 
@@ -67,7 +70,6 @@ def calculate_deadline(round_number):
         base_time = datetime.now(timezone.utc).replace(hour=14, minute=0, second=0, microsecond=0)
         
     test_interval = os.environ.get('NETWORK_TEST_INTERVAL_MINUTES')
-    
     if test_interval:
         delta = timedelta(minutes=int(test_interval))
     else:
@@ -83,7 +85,6 @@ def creating_session(subsession: Subsession):
         mode = os.environ.get('NETWORK_MODE', 'segregated').lower()
         subsession.session.vars['network_mode'] = mode
 
-        # --- DYNAMIC 4-QUEUE ROUTING FOR SIMULTANEOUS RUNS ---
         if mode == 'both' and Constants.NETWORK_DATA:
             seg_high, seg_low, int_high, int_low = [], [], [], []
 
@@ -106,7 +107,6 @@ def creating_session(subsession: Subsession):
             subsession.session.vars['queue_int_high'] = int_high
             subsession.session.vars['queue_int_low'] = int_low
             
-        # --- FALLBACK: SINGLE NETWORK RUNS ---
         else:
             network_size = Constants.players_per_group
             all_nodes = list(range(0, network_size))
@@ -255,7 +255,6 @@ def get_status_vars(player: Player):
         'bonus_amount': f"£{Constants.BONUS_AMOUNT:.2f} (approx. ${usd_bonus_approx:.2f})"
     }
 
-# --- STANDALONE FEED GENERATOR ---
 def generate_feed_for_player(player: Player):
     if player.participant.vars.get('screened_out', False):
         return
@@ -267,11 +266,9 @@ def generate_feed_for_player(player: Player):
     backlog = player.participant.vars.get('backlog', {})
     shared_history = player.participant.vars.get('shared_history', set())
     
-    # Check individual treatment, not the global mode
     treatment = player.participant.vars.get('network_treatment', 'segregated')
     baseline_key = f"{treatment}_baseline"
     node_str = str(player.node_id)
-    node_int = player.node_id
 
     neighbors = []
     starting_items = []
@@ -281,14 +278,12 @@ def generate_feed_for_player(player: Player):
         neighbors = baseline_data.get('network', {}).get(node_str, [])
         starting_items = baseline_data.get('nodes', {}).get(node_str, {}).get('starting_items', [])
     else:
-        neighbors = Constants.NETWORK_DATA.get(node_str, Constants.NETWORK_DATA.get(node_int, []))
+        neighbors = Constants.NETWORK_DATA.get(node_str, [])
     
     new_items = {}
 
     if player.round_number > 1:
         prev_subsession = player.subsession.in_round(player.round_number - 1)
-        
-        # --- THE FIREWALL ---
         prev_players = [p for p in prev_subsession.get_players() if p.participant.vars.get('network_treatment') == treatment]
         
         this_player_prev = next((p for p in prev_players if p.participant.vars.get('node_id') == player.node_id), None)
@@ -296,7 +291,7 @@ def generate_feed_for_player(player: Player):
             try:
                 shares = json.loads(this_player_prev.outgoing_shares)
                 for item_id in shares:
-                    shared_history.add(str(item_id))
+                    shared_history.add(str(item_id).strip().lower())
             except Exception:
                 pass
         player.participant.vars['shared_history'] = shared_history
@@ -307,17 +302,18 @@ def generate_feed_for_player(player: Player):
                 try:
                     n_shares = json.loads(n_player.outgoing_shares)
                     for item_id in n_shares:
-                        str_id = str(item_id)
+                        str_id = str(item_id).strip().lower()
                         if str_id not in shared_history:
                             new_items[str_id] = new_items.get(str_id, 0) + 1
                 except Exception:
                     pass
                     
-    backlog = {str(k): v for k, v in backlog.items() if str(k) not in shared_history}
+    # Clean up the backlog key matching for alphanumeric string IDs
+    backlog = {str(k).strip().lower(): v for k, v in backlog.items() if str(k).strip().lower() not in shared_history}
     feed_item_ids = []
 
     if player.round_number == 1 and starting_items:
-        feed_item_ids = [str(item) for item in starting_items]
+        feed_item_ids = [str(item).strip().lower() for item in starting_items]
     else:
         pool_new = list(new_items.keys())
         weights_new = [new_items[k] for k in pool_new]
@@ -340,29 +336,41 @@ def generate_feed_for_player(player: Player):
                 weights_old.pop(idx)
         
         for k, v in new_items.items():
-            backlog[str(k)] = backlog.get(str(k), 0) + v
+            clean_key = str(k).strip().lower()
+            backlog[clean_key] = backlog.get(clean_key, 0) + v
 
+    feed_items = []
+    mapped_ids = []
+    
+    # Extract structural content with case-insensitive, space-stripped comparisons
     for item_id in feed_item_ids:
-        if str(item_id) in backlog:
-            del backlog[str(item_id)]
-
-    if len(feed_item_ids) < 4:
-        needed = 4 - len(feed_item_ids)
-        all_ids = [str(item.get('id', '')) for item in Constants.NEWS_ITEMS]
-        available_pool = [i for i in all_ids if i not in feed_item_ids and i not in shared_history and i != '']
+        item_data = next((item for item in Constants.NEWS_ITEMS if str(item.get('id', '')).strip().lower() == item_id), None)
+        if item_data:
+            feed_items.append(item_data)
+            mapped_ids.append(item_id)
+        else:
+            print(f"[!] WARNING: Structural ID '{item_id}' requested but not found in news_items.csv")
+            
+    # Safety Net: Fall back to randomly selected backup rows if entries are missing
+    if len(feed_items) < 4:
+        needed = 4 - len(feed_items)
+        all_ids = [str(item.get('id', '')).strip().lower() for item in Constants.NEWS_ITEMS if item.get('id')]
+        available_pool = [i for i in all_ids if i not in mapped_ids and i not in shared_history and i != '']
+        
         if available_pool:
-            padding_items = random.sample(available_pool, min(needed, len(available_pool)))
-            feed_item_ids.extend(padding_items)
+            padding_ids = random.sample(available_pool, min(needed, len(available_pool)))
+            for pad_id in padding_ids:
+                pad_data = next((item for item in Constants.NEWS_ITEMS if str(item.get('id', '')).strip().lower() == pad_id), None)
+                if pad_data:
+                    feed_items.append(pad_data)
+                    mapped_ids.append(pad_id)
+
+    for item_id in mapped_ids:
+        if item_id in backlog:
+            del backlog[item_id]
 
     player.participant.vars['backlog'] = backlog
     player.current_backlog = json.dumps(backlog)
-
-    feed_items = []
-    for item_id in feed_item_ids:
-        item_data = next((item for item in Constants.NEWS_ITEMS if str(item.get('id', '')) == str(item_id)), None)
-        if item_data:
-            feed_items.append(item_data)
-            
     player.incoming_feed = json.dumps(feed_items)
 
 # --- PAGES ---
@@ -412,7 +420,6 @@ class ArrivalGatekeeper(Page):
             assigned_treatment = None
             mode = player.session.vars.get('network_mode', 'segregated')
 
-            # --- DYNAMIC LOAD BALANCER ---
             if mode == 'both':
                 if cat == 'High_Concern':
                     q_seg = player.session.vars['queue_seg_high']
