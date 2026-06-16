@@ -20,7 +20,7 @@ class Constants(BaseConstants):
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.40
-    FINAL_ROUND_PAY = 1.20
+    FINAL_ROUND_PAY = 0.80
     BONUS_AMOUNT = 4.00
     LOTTERY_AMOUNT = 80.00
     MAX_ALLOWED_MISSES = 1
@@ -53,11 +53,11 @@ class Constants(BaseConstants):
     else:
         MAPPING = {}
 
-    QUESTIONS = {
-        'opinion_1': {'text': "To what extent do you believe the world's climate is currently changing?", 'left': "Not at all", 'right': "A great deal"},
-        'opinion_2': {'text': "How likely do you think it is that climate change will lead to significant natural disasters?", 'left': "Not at all likely", 'right': "Extremely likely"},
-        'opinion_3': {'text': "To what extent do you feel a personal responsibility to try to reduce climate change?", 'left': "Not at all", 'right': "A great deal"},
-        'opinion_4': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}
+    QUESTIONS = { 
+        'opinion_1': {'text': "To what extent do you favor or oppose transitioning the country away from fossil fuels toward renewable energy?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'opinion_2': {'text': "To what extent do you favor or oppose the government subsidizing renewable energies?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'opinion_3': {'text': "To what extent do you favor or oppose the government prioritizing environmental protection over economic growth?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'opinion_4': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
     }
 
 def calculate_deadline(round_number):
