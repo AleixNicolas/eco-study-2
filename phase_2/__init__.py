@@ -541,7 +541,7 @@ class FeedTask_First(Page):
 
 class FeedTask_Second(Page):
     form_model = 'player'
-    template_name = __name__ + '/FeedTask_second.html'
+    template_name = __name__ + '/FeedTask_Second.html'
     
     @staticmethod
     def get_form_fields(player: Player):
