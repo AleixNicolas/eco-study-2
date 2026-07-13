@@ -526,6 +526,7 @@ class FeedTask_First(Page):
         vars_dict = {
             'step_indicator': 'Feed 1 of 2',
             'topic_display': topic_display,
+            'topic_display_lower': topic_display.lower(),
             'field_prefix': prefix,
             'deadline_timestamp': calculate_deadline(player.round_number).isoformat()
         }
@@ -558,6 +559,7 @@ class FeedTask_Second(Page):
         vars_dict = {
             'step_indicator': 'Feed 2 of 2',
             'topic_display': topic_display,
+            'topic_display_lower': topic_display.lower(),
             'field_prefix': prefix,
             'deadline_timestamp': calculate_deadline(player.round_number).isoformat()
         }
