@@ -507,7 +507,7 @@ class FeedTaskGatekeeper(Page):
 
 class FeedTask_First(Page):
     form_model = 'player'
-    template_name = __name__ + '/FeedTask.html'
+    template_name = __name__ + '/FeedTask_First.html'
     
     @staticmethod
     def get_form_fields(player: Player):
@@ -539,7 +539,7 @@ class FeedTask_First(Page):
 
 class FeedTask_Second(Page):
     form_model = 'player'
-    template_name = __name__ + '/FeedTask.html'
+    template_name = __name__ + '/FeedTask_second.html'
     
     @staticmethod
     def get_form_fields(player: Player):
