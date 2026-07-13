@@ -1,97 +1,93 @@
-<div class="container-fluid mb-5">
-    <h3 class="mb-4">Phase 2: Network & Dual-Topic Diagnostics</h3>
+<div class="card mt-4">
+    <div class="card-body">
+        <h3 class="card-title mb-4">Phase 2: Network Analysis</h3>
+        <p class="lead">Total Valid Players: <strong>{{ total_players }}</strong></p>
 
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">Session Overview</h5>
-        </div>
-        <div class="card-body">
-            <p class="mb-0">Total Participants Tracked: <strong>{{ total_players }}</strong></p>
-            <p class="mb-0 text-muted small">Treatments Active: {{ treatments }}</p>
-        </div>
-    </div>
+        {{ for treatment in treatments }}
+            <hr class="my-5">
+            <h4 class="text-primary mb-4">
+                Treatment: <span style="text-transform: capitalize;">{{ treatment }}</span>
+            </h4>
 
-    <div class="row">
-        <div class="col-md-6">
-            <h4 class="mb-3 border-bottom pb-2 text-success">Climate Policy Data</h4>
-            
-            <div class="card mb-4 shadow-sm border-success">
-                <div class="card-header bg-success text-white"><h5 class="mb-0">Feed Leanings (Climate)</h5></div>
-                <div class="card-body">
-                    <table class="table table-bordered table-sm">
-                        <thead class="table-light"><tr><th>Category</th><th>Leaning</th><th>Presence (%)</th></tr></thead>
+            <div class="row">
+                <div class="col-md-6">
+                    <h5 class="text-secondary border-bottom pb-2">Climate Network</h5>
+                    
+                    <h6 class="mt-3">Feed Lean Percentages</h6>
+                    <table class="table table-sm table-bordered bg-light">
+                        <thead class="table-dark">
+                            <tr><th>Profile</th><th>Article Leanings Displayed</th></tr>
+                        </thead>
                         <tbody>
-                            {{ for treatment, categories in feed_lean_percentages.climate.items() }}
-                                <tr><td colspan="3" class="bg-light fw-bold text-center">Treatment: {{ treatment | title }}</td></tr>
-                                {{ for cat, leanings in categories.items() }}
-                                    <tr><td colspan="3" class="ps-3 text-secondary"><em>{{ cat }}</em></td></tr>
-                                    {{ for lean, pct in leanings.items() }}
-                                    <tr><td></td><td class="ps-4">{{ lean }}</td><td>{{ pct }}%</td></tr>
+                            {{ for cat, leans in feed_lean_percentages.climate[treatment].items() }}
+                            <tr>
+                                <td class="fw-bold">{{ cat }}</td>
+                                <td>
+                                    {{ for lean, pct in leans.items() }}
+                                        {{ lean }}: {{ pct }}%<br>
                                     {{ endfor }}
-                                {{ endfor }}
+                                </td>
+                            </tr>
+                            {{ endfor }}
+                        </tbody>
+                    </table>
+
+                    <h6 class="mt-4">Avg Opinion Change (Final - Baseline)</h6>
+                    <table class="table table-sm table-bordered bg-light">
+                        <thead class="table-dark">
+                            <tr><th>Profile</th><th>Fossil Fuels (Q1)</th><th>Taxes (Q2)</th></tr>
+                        </thead>
+                        <tbody>
+                            {{ for cat, changes in avg_opinion_change.climate[treatment].items() }}
+                            <tr>
+                                <td class="fw-bold">{{ cat }}</td>
+                                <td>{{ changes.opinion_1 }}</td>
+                                <td>{{ changes.opinion_2 }}</td>
+                            </tr>
                             {{ endfor }}
                         </tbody>
                     </table>
                 </div>
-            </div>
 
-            <div class="card mb-4 shadow-sm border-success">
-                <div class="card-header bg-success text-white"><h5 class="mb-0">Opinion Change (Climate)</h5></div>
-                <div class="card-body">
-                    <table class="table table-bordered table-sm">
-                        <thead class="table-light"><tr><th>Category</th><th>Op 1 (Fossil Fuels)</th><th>Op 2 (Subsidies)</th></tr></thead>
+                <div class="col-md-6">
+                    <h5 class="text-secondary border-bottom pb-2">Immigration Network</h5>
+                    
+                    <h6 class="mt-3">Feed Lean Percentages</h6>
+                    <table class="table table-sm table-bordered bg-light">
+                        <thead class="table-dark">
+                            <tr><th>Profile</th><th>Article Leanings Displayed</th></tr>
+                        </thead>
                         <tbody>
-                            {{ for treatment, categories in avg_opinion_change.climate.items() }}
-                                <tr><td colspan="3" class="bg-light fw-bold text-center">Treatment: {{ treatment | title }}</td></tr>
-                                {{ for cat, changes in categories.items() }}
-                                <tr><td><strong>{{ cat }}</strong></td><td>{{ changes.opinion_1 }}</td><td>{{ changes.opinion_2 }}</td></tr>
-                                {{ endfor }}
-                            {{ endfor }}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <h4 class="mb-3 border-bottom pb-2 text-primary">Immigration Policy Data</h4>
-            
-            <div class="card mb-4 shadow-sm border-primary">
-                <div class="card-header bg-primary text-white"><h5 class="mb-0">Feed Leanings (Immigration)</h5></div>
-                <div class="card-body">
-                    <table class="table table-bordered table-sm">
-                        <thead class="table-light"><tr><th>Category</th><th>Leaning</th><th>Presence (%)</th></tr></thead>
-                        <tbody>
-                            {{ for treatment, categories in feed_lean_percentages.imm.items() }}
-                                <tr><td colspan="3" class="bg-light fw-bold text-center">Treatment: {{ treatment | title }}</td></tr>
-                                {{ for cat, leanings in categories.items() }}
-                                    <tr><td colspan="3" class="ps-3 text-secondary"><em>{{ cat }}</em></td></tr>
-                                    {{ for lean, pct in leanings.items() }}
-                                    <tr><td></td><td class="ps-4">{{ lean }}</td><td>{{ pct }}%</td></tr>
+                            {{ for cat, leans in feed_lean_percentages.imm[treatment].items() }}
+                            <tr>
+                                <td class="fw-bold">{{ cat }}</td>
+                                <td>
+                                    {{ for lean, pct in leans.items() }}
+                                        {{ lean }}: {{ pct }}%<br>
                                     {{ endfor }}
-                                {{ endfor }}
+                                </td>
+                            </tr>
                             {{ endfor }}
                         </tbody>
                     </table>
-                </div>
-            </div>
 
-            <div class="card mb-4 shadow-sm border-primary">
-                <div class="card-header bg-primary text-white"><h5 class="mb-0">Opinion Change (Immigration)</h5></div>
-                <div class="card-body">
-                    <table class="table table-bordered table-sm">
-                        <thead class="table-light"><tr><th>Category</th><th>Op 1 (Legal Imm)</th><th>Op 2 (Path to Cit)</th></tr></thead>
+                    <h6 class="mt-4">Avg Opinion Change (Final - Baseline)</h6>
+                    <table class="table table-sm table-bordered bg-light">
+                        <thead class="table-dark">
+                            <tr><th>Profile</th><th>Legal Imm. (Q1)</th><th>Citizenship (Q2)</th></tr>
+                        </thead>
                         <tbody>
-                            {{ for treatment, categories in avg_opinion_change.imm.items() }}
-                                <tr><td colspan="3" class="bg-light fw-bold text-center">Treatment: {{ treatment | title }}</td></tr>
-                                {{ for cat, changes in categories.items() }}
-                                <tr><td><strong>{{ cat }}</strong></td><td>{{ changes.opinion_1 }}</td><td>{{ changes.opinion_2 }}</td></tr>
-                                {{ endfor }}
+                            {{ for cat, changes in avg_opinion_change.imm[treatment].items() }}
+                            <tr>
+                                <td class="fw-bold">{{ cat }}</td>
+                                <td>{{ changes.opinion_1 }}</td>
+                                <td>{{ changes.opinion_2 }}</td>
+                            </tr>
                             {{ endfor }}
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
+        {{ endfor }}
     </div>
 </div>
