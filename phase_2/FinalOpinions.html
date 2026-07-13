@@ -1,90 +1,116 @@
-{{ block title }}Final Opinions{{ endblock }}
+{{ block title }}Final Survey{{ endblock }}
 
 {{ block content }}
 {{ include 'phase_2/StatusHeader.html' }}
 
-    <style>
+<div class="card shadow-sm p-4 mt-4">
+    <h3 class="mb-4 text-center">Your Opinions</h3>
+    <p class="mb-4">Please indicate your response to the following items based on your current views.</p>
+
+    <h4 class="mt-4 mb-3 text-primary border-bottom pb-2">Climate</h4>
+    
+    <div class="mb-4 shadow-sm p-4 border rounded bg-light">
+        <p class="fw-bold mb-2 text-center" style="font-size: 1.05rem;">{{ Constants.QUESTIONS.climate_opinion_1.text }}</p>
+        <div class="likert-container">
+            <div class="likert-anchor anchor-left">{{ Constants.QUESTIONS.climate_opinion_1.left }}</div>
+            <div class="likert-inputs">{{ formfield 'climate_opinion_1' label="" }}</div>
+            <div class="likert-anchor anchor-right">{{ Constants.QUESTIONS.climate_opinion_1.right }}</div>
+        </div>
+    </div>
+
+    <div class="mb-4 shadow-sm p-4 border rounded bg-light">
+        <p class="fw-bold mb-2 text-center" style="font-size: 1.05rem;">{{ Constants.QUESTIONS.climate_opinion_2.text }}</p>
+        <div class="likert-container">
+            <div class="likert-anchor anchor-left">{{ Constants.QUESTIONS.climate_opinion_2.left }}</div>
+            <div class="likert-inputs">{{ formfield 'climate_opinion_2' label="" }}</div>
+            <div class="likert-anchor anchor-right">{{ Constants.QUESTIONS.climate_opinion_2.right }}</div>
+        </div>
+    </div>
+
+    <h4 class="mt-5 mb-3 text-primary border-bottom pb-2">Immigration</h4>
+
+    <div class="mb-4 shadow-sm p-4 border rounded bg-light">
+        <p class="fw-bold mb-2 text-center" style="font-size: 1.05rem;">{{ Constants.QUESTIONS.imm_opinion_1.text }}</p>
+        <div class="likert-container">
+            <div class="likert-anchor anchor-left">{{ Constants.QUESTIONS.imm_opinion_1.left }}</div>
+            <div class="likert-inputs">{{ formfield 'imm_opinion_1' label="" }}</div>
+            <div class="likert-anchor anchor-right">{{ Constants.QUESTIONS.imm_opinion_1.right }}</div>
+        </div>
+    </div>
+
+    <div class="mb-4 shadow-sm p-4 border rounded bg-light">
+        <p class="fw-bold mb-2 text-center" style="font-size: 1.05rem;">{{ Constants.QUESTIONS.imm_opinion_2.text }}</p>
+        <div class="likert-container">
+            <div class="likert-anchor anchor-left">{{ Constants.QUESTIONS.imm_opinion_2.left }}</div>
+            <div class="likert-inputs">{{ formfield 'imm_opinion_2' label="" }}</div>
+            <div class="likert-anchor anchor-right">{{ Constants.QUESTIONS.imm_opinion_2.right }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center mt-4 mb-5">
+    <button class="btn btn-primary btn-lg px-5 otree-btn-next">Next</button>
+</div>
+
+<style>
+    .likert-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        margin-top: 10px;
+    }
+    .likert-anchor {
+        font-weight: 500;
+        color: #555;
+        flex: 1;
+        font-size: 0.9rem;
+    }
+    .anchor-left {
+        text-align: right;
+    }
+    .anchor-right {
+        text-align: left;
+    }
+    .likert-inputs .mb-3 {
+        margin-bottom: 0 !important;
+    }
+    
+    /* Mobile Scaling */
+    @media (max-width: 767px) {
         .likert-container {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin-top: 10px;
-        }
-        .likert-anchor {
-            font-weight: 500;
-            color: #555;
-            flex: 1;
-            font-size: 0.9rem;
+            flex-wrap: wrap;
+            justify-content: space-between;
         }
         .anchor-left {
-            text-align: right;
+            order: 1;
+            text-align: left;
+            flex: 0 0 45%;
+            font-size: 0.8rem;
+            line-height: 1.2;
         }
         .anchor-right {
-            text-align: left;
+            order: 2;
+            text-align: right;
+            flex: 0 0 45%;
+            font-size: 0.8rem;
+            line-height: 1.2;
         }
-        .likert-inputs .mb-3 {
-            margin-bottom: 0 !important;
+        .likert-inputs {
+            order: 3;
+            flex: 0 0 100%;
+            margin-top: 12px;
         }
-
-        /* --- MOBILE LIKERT FIX --- */
-        @media (max-width: 767px) {
-            .likert-container {
-                flex-wrap: wrap;
-                justify-content: space-between;
-            }
-            .anchor-left {
-                order: 1;
-                text-align: left;
-                flex: 0 0 45%;
-                font-size: 0.8rem;
-                line-height: 1.2;
-            }
-            .anchor-right {
-                order: 2;
-                text-align: right;
-                flex: 0 0 45%;
-                font-size: 0.8rem;
-                line-height: 1.2;
-            }
-            .likert-inputs {
-                order: 3;
-                flex: 0 0 100%;
-                margin-top: 12px;
-            }
-            .likert-inputs .controls {
-                display: flex !important;
-                flex-direction: row !important;
-                flex-wrap: nowrap !important;
-                justify-content: space-between !important;
-                width: 100%;
-            }
-            .likert-inputs .form-check-inline {
-                margin-right: 0 !important;
-            }
-            .likert-inputs label {
-                font-size: 0.9rem;
-            }
+        .likert-inputs .controls {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            justify-content: space-between !important;
+            width: 100%;
         }
-    </style>
-
-    <p class="mb-4">Please indicate your response to the following items based on your current views at the end of this experiment.</p>
-
-    {{ for q in questions_data }}
-        <div class="mb-4 shadow-sm p-4 border rounded bg-light">
-            <p class="fw-bold mb-2 text-center" style="font-size: 1.05rem;">{{ q.text }}</p>
-            
-            <div class="likert-container">
-                <div class="likert-anchor anchor-left">{{ q.left }}</div>
-                <div class="likert-inputs">
-                    {{ formfield q.name label="" }}
-                </div>
-                <div class="likert-anchor anchor-right">{{ q.right }}</div>
-            </div>
-        </div>
-    {{ endfor }}
-
-    <div class="text-center mt-5 mb-4">
-        {{ next_button }}
-    </div>
+        .likert-inputs .form-check-inline {
+            margin-right: 0 !important;
+        }
+    }
+</style>
 {{ endblock }}

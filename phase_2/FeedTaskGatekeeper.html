@@ -1,7 +1,7 @@
 {{ block title }}
     {{ if player.round_number == 1 }}Welcome to the Experiment
     {{ elif player.round_number == total_rounds }}Final Round
-    {{ else }}Daily Feed{{ endif }}
+    {{ else }}Daily Task{{ endif }}
 {{ endblock }}
 
 {{ block content }}
@@ -10,18 +10,17 @@
 <div class="card shadow-sm p-4 mt-5">
     {{ if player.round_number == 1 }}
         <h4 class="mb-4 text-primary text-center">You have successfully enrolled in the study.</h4>
-        
         <hr class="my-4">
         
         <h5>What you will do</h5>
-        <p>For 5 days, you will complete one short daily task about environmental news.<br>In each daily round:</p>
+        <p>For 5 days, you will complete a short daily task consisting of <strong>two distinct news feeds</strong>: one covering Climate Policy, and one covering Immigration Policy.</p>
+        <p>In each feed:</p>
         <ul>
             <li>Read the headlines.</li>
             <li>Click <strong>Read More</strong> to view the full summary.</li>
-            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong> based on whether you think the article is worth sharing. <em>(You can share anywhere from 0 to all 4 articles).</em></li>
+            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong>.</li>
         </ul>
-        <p>Articles you choose to share may be shown to other participants.</p>
-        <p>Each daily round takes about 2 minutes. You can complete each round at any time during its 24-hour window.</p>
+        <p>Articles you choose to share may be shown to other participants. The entire process takes about 3 to 4 minutes per day. You can complete it at any time during its 24-hour window.</p>
         
         <h5 class="mt-4">Payment</h5>
         <ul>
@@ -32,44 +31,32 @@
         
     {{ elif player.round_number == total_rounds }}
         <h4 class="mb-4 text-primary text-center">Welcome to the Final Round</h4>
-        <p class="text-center">Your feed has been updated with the shares of other participants.</p>
-        
+        <p class="text-center">Your feeds have been updated with the shares of other participants.</p>
         <hr class="my-3">
         
         <h5>What will you do?</h5>
-        <p>Today is the final day. You will complete your last daily task about environmental news, followed by a short final survey.<br>In today's round:</p>
-        <ul>
-            <li>Read the headlines.</li>
-            <li>Click <strong>Read More</strong> to view the full summary.</li>
-            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong> based on whether you think the article is worth sharing. <em>(You can share anywhere from 0 to all 4 articles).</em></li>
-        </ul>
-        <p>Articles you choose to share may be shown to other participants.</p>
-        <p>This final task and survey should not take more than 4 minutes in total. You can complete it at any time during its 24-hour window.</p>
+        <p>Today is the final day. You will review your last two feeds (Climate and Immigration), followed by a short final survey.</p>
+        <p>This final task and survey should not take more than 5 minutes. You can complete it at any time during its 24-hour window.</p>
         
         <div class="alert alert-light border mt-4">
-            <strong>Today's Payment:</strong> £0.80 (approx. $1.00) upon completion of this feed and the final survey.<br>
+            <strong>Today's Payment:</strong> £0.80 (approx. $1.00) upon completion of these feeds and the final survey.<br>
             <small class="text-muted"><em>Reminder: Completing today is mandatory to be eligible for the £4.00 (approx. $5.00) bonus (if you reach 4 total rounds) and the £80.00 (approx. $100.00) lottery (if you complete all 5).</em></small>
         </div>
 
-
     {{ else }}
         <h4 class="mb-4 text-primary text-center">Welcome to Round {{ player.round_number }}</h4>
-        <p class="text-center">Your feed has been updated with the shares of other participants.</p>
-        
+        <p class="text-center">Your feeds have been updated with the shares of other participants.</p>
         <hr class="my-3">
         
         <h5>What will you do?</h5>
-        <p>You will complete your daily task about environmental news.<br>In today's round:</p>
+        <p>You will review your two daily feeds (Climate and Immigration).</p>
         <ul>
-            <li>Read the headlines.</li>
-            <li>Click <strong>Read More</strong> to view the full summary.</li>
-            <li>For each article, choose <strong>Share</strong> or <strong>Not Share</strong> based on whether you think the article is worth sharing. <em>(You can share anywhere from 0 to all 4 articles).</em></li>
+            <li>Click <strong>Read More</strong> to unlock the sharing options.</li>
+            <li>Decide to <strong>Share</strong> or <strong>Not Share</strong> for every article across both topics.</li>
         </ul>
-        <p>Articles you choose to share may be shown to other participants.</p>
-        <p>This task takes about 2 minutes. You can complete it at any time during its 24-hour window.</p>
         
         <div class="alert alert-light border mt-4">
-            <strong>Today's Payment:</strong> £0.40 (approx. $0.50) upon completion of this feed.<br>
+            <strong>Today's Payment:</strong> £0.40 (approx. $0.50) upon completion of this task.<br>
             <small class="text-muted"><em>Reminder: You need 4 total rounds for the £4.00 (approx. $5.00) bonus, and all 5 rounds to enter the £80.00 (approx. $100.00) lottery.</em></small>
         </div>
         
@@ -80,8 +67,7 @@
     <button class="btn btn-success btn-lg px-5 otree-btn-next">
         {{ if player.round_number == 1 }}Begin Task
         {{ elif player.round_number == total_rounds }}Begin Final Task
-        {{ else }}View Daily Feed{{ endif }}
+        {{ else }}View Feeds{{ endif }}
     </button>
 </div>
-
 {{ endblock }}

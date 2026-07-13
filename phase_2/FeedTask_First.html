@@ -1,4 +1,4 @@
-{{ block title }}News Feed - Round {{ player.round_number }}{{ endblock }}
+{{ block title }}{{ step_indicator }}{{ endblock }}
 
 {{ block content }}
 <style>
@@ -26,21 +26,22 @@
     <div class="timer-container" id="visual-timer">--:--:--</div>
 </div>
 
-<input type="hidden" name="outgoing_shares" id="outgoing_shares">
-<input type="hidden" name="average_feed_size" id="average_feed_size">
-<input type="hidden" name="max_feed_size" id="max_feed_size">
-<input type="hidden" name="average_pending_items" id="average_pending_items">
-<input type="hidden" name="max_pending_items" id="max_pending_items">
-<input type="hidden" name="total_time_on_feed" id="total_time_on_feed">
+<h4 class="mb-3 border-bottom pb-2 text-primary">{{ topic_display }}</h4>
+<p class="text-muted mb-4">Please review these articles regarding {{ topic_display | lower }} and decide what to share.</p>
+
+<input type="hidden" name="{{ field_prefix }}_outgoing_shares" id="outgoing_shares">
+<input type="hidden" name="{{ field_prefix }}_average_feed_size" id="average_feed_size">
+<input type="hidden" name="{{ field_prefix }}_max_feed_size" id="max_feed_size">
+<input type="hidden" name="{{ field_prefix }}_average_pending_items" id="average_pending_items">
+<input type="hidden" name="{{ field_prefix }}_max_pending_items" id="max_pending_items">
+<input type="hidden" name="{{ field_prefix }}_total_time_on_feed" id="total_time_on_feed">
 
 <div class="row">
     <div class="col-md-8 order-2 order-md-1" style="padding-right: 15px;">
-        <p class="text-muted small mb-2 d-block d-md-none">Review the news articles below. Tap "Read More" to expand.</p>
-        <p class="text-muted small mb-2 d-none d-md-block">Review the articles. You may read the story before deciding whether to share each article.</p>
         <div id="feed-container"></div>
         
         <div class="text-center mt-4 mb-5">
-            <button type="button" class="btn btn-success btn-lg px-5" id="submit-btn" onclick="submitFeed()">Complete Round</button>
+            <button type="button" class="btn btn-success btn-lg px-5" id="submit-btn" onclick="submitFeed()">Proceed</button>
         </div>
     </div>
 
@@ -64,16 +65,14 @@
     const timerInterval = setInterval(function() {
         const now = new Date().getTime();
         const distance = targetDate.getTime() - now;
-
         if (distance <= 0) {
             clearInterval(timerInterval);
             document.getElementById("visual-timer").innerText = "TIME EXPIRED";
-            document.getElementById("deadline-banner").classList.remove("alert-warning");
-            document.getElementById("deadline-banner").classList.add("alert-danger");
+            document.getElementById("deadline-banner").className = "alert alert-danger d-flex flex-column flex-md-row justify-content-between align-items-center shadow-sm mb-4";
         } else {
-            const h = Math.floor(distance / (1000 * 60 * 60)).toString().padStart(2, '0');
-            const m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
-            const s = Math.floor((distance % (1000 * 60)) / 1000).toString().padStart(2, '0');
+            const h = Math.floor(distance / 3600000).toString().padStart(2, '0');
+            const m = Math.floor((distance % 3600000) / 60000).toString().padStart(2, '0');
+            const s = Math.floor((distance % 60000) / 1000).toString().padStart(2, '0');
             document.getElementById("visual-timer").innerText = `${h}h ${m}m ${s}s`;
         }
     }, 1000);
@@ -84,13 +83,9 @@
         feedData.forEach((item, index) => {
             let card = document.createElement('div');
             card.className = "card bg-light news-item";
-            
             card.innerHTML = `
                 <h6 class="fw-bold">${item.headline}</h6>
-                <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-2 text-muted d-md-none small">
-                    ${item.additional_text}
-                </div>
-                
+                <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-2 text-muted d-md-none small">${item.additional_text}</div>
                 <div class="d-flex align-items-center justify-content-between mt-1">
                     <div class="compact-decision">
                         <div class="controls">
@@ -104,9 +99,7 @@
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-primary py-0 text-nowrap" style="height: 30px;" onclick="showArticle(${index})">
-                        Read More
-                    </button>
+                    <button type="button" class="btn btn-sm btn-primary py-0 text-nowrap" style="height: 30px;" onclick="showArticle(${index})">Read More</button>
                 </div>
             `;
             container.appendChild(card);
@@ -120,15 +113,12 @@
             document.getElementById('display-body').innerText = item.additional_text;
         } else {
             let mobileContent = document.getElementById('mobile_body_' + index);
-            if (mobileContent.style.display === 'block') {
-                mobileContent.style.display = 'none';
-            } else {
+            if (mobileContent.style.display === 'block') { mobileContent.style.display = 'none'; } 
+            else {
                 document.querySelectorAll('.mobile-article-body').forEach(el => el.style.display = 'none');
                 mobileContent.style.display = 'block';
             }
         }
-
-        // Enable the radio buttons for this specific item once read
         document.getElementById(`share_${index}`).disabled = false;
         document.getElementById(`not_share_${index}`).disabled = false;
         document.getElementById(`label_share_${index}`).classList.remove('text-muted');
@@ -146,18 +136,14 @@
     function submitFeed() {
         let shares = [];
         let missingDecision = false;
-
         for (let i = 0; i < feedSize; i++) {
             let selected = document.querySelector(`input[name="decision_${i}"]:checked`);
-            if (!selected) {
-                missingDecision = true;
-            } else if (selected.value !== "Not Share") {
-                shares.push(selected.value);
-            }
+            if (!selected) { missingDecision = true; } 
+            else if (selected.value !== "Not Share") { shares.push(selected.value); }
         }
 
         if (missingDecision) {
-            alert("Please select 'Share' or 'Not Share' for every article before completing the round. Make sure you click 'Read More' to unlock the choices.");
+            alert("Please select 'Share' or 'Not Share' for every article. Click 'Read More' to unlock choices.");
             return;
         }
 
@@ -171,7 +157,6 @@
         document.getElementById('max_pending_items').value = maxPending;
         document.getElementById('average_pending_items').value = avgPending.toFixed(2);
         document.getElementById('total_time_on_feed').value = (Date.now() - startTime) / 1000;
-
         document.getElementById('form').submit();
     }
 </script>

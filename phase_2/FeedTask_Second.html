@@ -1,0 +1,163 @@
+{{ block title }}{{ step_indicator }}{{ endblock }}
+
+{{ block content }}
+<style>
+    .compact-decision .controls { display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; justify-content: flex-start; gap: 15px; } 
+    .compact-decision .form-check { margin-bottom: 0 !important; white-space: nowrap; } 
+    .compact-decision .form-check-label { font-size: 0.85rem; }
+    .news-item { padding: 8px 10px !important; margin-bottom: 6px !important; border-radius: 6px; } 
+    .news-item h6 { font-size: 0.9rem; margin-bottom: 4px !important; line-height: 1.2; } 
+    #reading-pane { top: 10px; min-height: 350px; height: calc(100vh - 200px); overflow-y: auto; } 
+    .mobile-article-body { display: none; background-color: #fff; border-left: 3px solid #0d6efd; } 
+    .mobile-article-body.show { display: block; } 
+    @media (max-width: 767px) {
+        .compact-decision .controls { flex-wrap: wrap !important; gap: 5px; }
+        #reading-pane { height: auto; min-height: 200px; }
+    }
+    .timer-container { font-family: monospace; font-size: 1.25rem; font-weight: bold; }
+</style>
+
+{{ include 'phase_2/StatusHeader.html' }}
+
+<div class="alert alert-warning d-flex flex-column flex-md-row justify-content-between align-items-center shadow-sm mb-4" id="deadline-banner">
+    <div class="mb-2 mb-md-0 text-center text-md-start">
+        <strong>Daily Deadline:</strong> Submit your decisions before time expires.
+    </div>
+    <div class="timer-container" id="visual-timer">--:--:--</div>
+</div>
+
+<h4 class="mb-3 border-bottom pb-2 text-primary">{{ topic_display }}</h4>
+<p class="text-muted mb-4">Please review these articles regarding {{ topic_display | lower }} and decide what to share.</p>
+
+<input type="hidden" name="{{ field_prefix }}_outgoing_shares" id="outgoing_shares">
+<input type="hidden" name="{{ field_prefix }}_average_feed_size" id="average_feed_size">
+<input type="hidden" name="{{ field_prefix }}_max_feed_size" id="max_feed_size">
+<input type="hidden" name="{{ field_prefix }}_average_pending_items" id="average_pending_items">
+<input type="hidden" name="{{ field_prefix }}_max_pending_items" id="max_pending_items">
+<input type="hidden" name="{{ field_prefix }}_total_time_on_feed" id="total_time_on_feed">
+
+<div class="row">
+    <div class="col-md-8 order-2 order-md-1" style="padding-right: 15px;">
+        <div id="feed-container"></div>
+        
+        <div class="text-center mt-4 mb-5">
+            <button type="button" class="btn btn-success btn-lg px-5" id="submit-btn" onclick="submitFeed()">Proceed</button>
+        </div>
+    </div>
+
+    <div class="col-md-4 order-1 order-md-2 mb-3 d-none d-md-block">
+        <div id="reading-pane" class="card shadow-sm p-3 sticky-top">
+            <h5 id="display-headline" class="h6 text-primary">Select an article to read</h5>
+            <hr class="my-2">
+            <p id="display-body" class="small text-muted" style="line-height: 1.45;"></p>
+        </div>
+    </div>
+</div>
+
+<script>
+    let startTime = Date.now();
+    let feedData = js_vars.incoming_feed;
+    let container = document.getElementById('feed-container');
+    let feedSize = feedData.length;
+    let backlogChecks = [];
+
+    const targetDate = new Date("{{ deadline_timestamp }}");
+    const timerInterval = setInterval(function() {
+        const now = new Date().getTime();
+        const distance = targetDate.getTime() - now;
+        if (distance <= 0) {
+            clearInterval(timerInterval);
+            document.getElementById("visual-timer").innerText = "TIME EXPIRED";
+            document.getElementById("deadline-banner").className = "alert alert-danger d-flex flex-column flex-md-row justify-content-between align-items-center shadow-sm mb-4";
+        } else {
+            const h = Math.floor(distance / 3600000).toString().padStart(2, '0');
+            const m = Math.floor((distance % 3600000) / 60000).toString().padStart(2, '0');
+            const s = Math.floor((distance % 60000) / 1000).toString().padStart(2, '0');
+            document.getElementById("visual-timer").innerText = `${h}h ${m}m ${s}s`;
+        }
+    }, 1000);
+
+    if (feedSize === 0) {
+        container.innerHTML = "<div class='alert alert-info'>Your neighbors did not share any new items today.</div>";
+    } else {
+        feedData.forEach((item, index) => {
+            let card = document.createElement('div');
+            card.className = "card bg-light news-item";
+            card.innerHTML = `
+                <h6 class="fw-bold">${item.headline}</h6>
+                <div id="mobile_body_${index}" class="mobile-article-body p-2 mb-2 text-muted d-md-none small">${item.additional_text}</div>
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <div class="compact-decision">
+                        <div class="controls">
+                            <div class="form-check">
+                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="${item.id}" id="share_${index}" disabled>
+                                <label class="form-check-label text-muted" for="share_${index}" id="label_share_${index}">Share</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input share-radio" type="radio" name="decision_${index}" value="Not Share" id="not_share_${index}" disabled>
+                                <label class="form-check-label text-muted" for="not_share_${index}" id="label_not_share_${index}">Not Share</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary py-0 text-nowrap" style="height: 30px;" onclick="showArticle(${index})">Read More</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function showArticle(index) {
+        let item = feedData[index];
+        if (window.innerWidth >= 768) {
+            document.getElementById('display-headline').innerText = item.headline;
+            document.getElementById('display-body').innerText = item.additional_text;
+        } else {
+            let mobileContent = document.getElementById('mobile_body_' + index);
+            if (mobileContent.style.display === 'block') { mobileContent.style.display = 'none'; } 
+            else {
+                document.querySelectorAll('.mobile-article-body').forEach(el => el.style.display = 'none');
+                mobileContent.style.display = 'block';
+            }
+        }
+        document.getElementById(`share_${index}`).disabled = false;
+        document.getElementById(`not_share_${index}`).disabled = false;
+        document.getElementById(`label_share_${index}`).classList.remove('text-muted');
+        document.getElementById(`label_not_share_${index}`).classList.remove('text-muted');
+    }
+
+    setInterval(() => {
+        let count = 0;
+        for (let i = 0; i < feedSize; i++) {
+            if (!document.querySelector(`input[name="decision_${i}"]:checked`)) count++;
+        }
+        backlogChecks.push(count);
+    }, 500);
+
+    function submitFeed() {
+        let shares = [];
+        let missingDecision = false;
+        for (let i = 0; i < feedSize; i++) {
+            let selected = document.querySelector(`input[name="decision_${i}"]:checked`);
+            if (!selected) { missingDecision = true; } 
+            else if (selected.value !== "Not Share") { shares.push(selected.value); }
+        }
+
+        if (missingDecision) {
+            alert("Please select 'Share' or 'Not Share' for every article. Click 'Read More' to unlock choices.");
+            return;
+        }
+
+        document.getElementById('outgoing_shares').value = JSON.stringify(shares);
+        document.getElementById('max_feed_size').value = feedSize;
+        document.getElementById('average_feed_size').value = feedSize.toFixed(2);
+        
+        let maxPending = backlogChecks.length > 0 ? Math.max(...backlogChecks) : feedSize;
+        let avgPending = backlogChecks.length > 0 ? (backlogChecks.reduce((a,b) => a+b, 0) / backlogChecks.length) : feedSize;
+        
+        document.getElementById('max_pending_items').value = maxPending;
+        document.getElementById('average_pending_items').value = avgPending.toFixed(2);
+        document.getElementById('total_time_on_feed').value = (Date.now() - startTime) / 1000;
+        document.getElementById('form').submit();
+    }
+</script>
+{{ endblock }}
