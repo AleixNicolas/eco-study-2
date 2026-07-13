@@ -298,6 +298,7 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
     if baseline_key in Constants.NETWORK_DATA:
         baseline_data = Constants.NETWORK_DATA[baseline_key]
         neighbors = baseline_data.get('network', {}).get(node_str, [])
+        # Both topics use the exact same ID format from the generic 'starting_items' key
         starting_items = baseline_data.get('nodes', {}).get(node_str, {}).get('starting_items', [])
     
     new_items = {}
