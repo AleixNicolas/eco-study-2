@@ -182,11 +182,38 @@ def vars_for_admin_report(subsession: Subsession):
                         
                 avg_opinion_change[topic][treatment][cat] = avg_change
 
+    # --- FLATTEN DATA FOR BULLETPROOF HTML TEMPLATE ---
+    treatment_reports = []
+    for treatment in treatments:
+        c_leans_list = []
+        for cat, leans in feed_lean_percentages['climate'][treatment].items():
+            leans_arr = [{'lean': k, 'pct': v} for k, v in leans.items()]
+            c_leans_list.append({'cat': cat, 'leans': leans_arr})
+
+        c_changes_list = []
+        for cat, changes in avg_opinion_change['climate'][treatment].items():
+            c_changes_list.append({'cat': cat, 'op1': changes['opinion_1'], 'op2': changes['opinion_2']})
+
+        i_leans_list = []
+        for cat, leans in feed_lean_percentages['imm'][treatment].items():
+            leans_arr = [{'lean': k, 'pct': v} for k, v in leans.items()]
+            i_leans_list.append({'cat': cat, 'leans': leans_arr})
+
+        i_changes_list = []
+        for cat, changes in avg_opinion_change['imm'][treatment].items():
+            i_changes_list.append({'cat': cat, 'op1': changes['opinion_1'], 'op2': changes['opinion_2']})
+
+        treatment_reports.append({
+            'name': treatment,
+            'climate_leans': c_leans_list,
+            'climate_changes': c_changes_list,
+            'imm_leans': i_leans_list,
+            'imm_changes': i_changes_list,
+        })
+
     return {
         'total_players': total_players,
-        'treatments': treatments,
-        'feed_lean_percentages': feed_lean_percentages,
-        'avg_opinion_change': avg_opinion_change
+        'treatment_reports': treatment_reports
     }
 
 class Group(BaseGroup):
