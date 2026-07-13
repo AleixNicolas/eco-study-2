@@ -17,6 +17,8 @@ class Constants(BaseConstants):
     name_in_url = 'phase_2'
     
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
+    
+    # Restored: Strictly enforces multiples of the group size
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.40
@@ -182,7 +184,6 @@ def vars_for_admin_report(subsession: Subsession):
                         
                 avg_opinion_change[topic][treatment][cat] = avg_change
 
-    # --- FLATTEN DATA FOR BULLETPROOF HTML TEMPLATE ---
     treatment_reports = []
     for treatment in treatments:
         c_leans_list = []
@@ -404,8 +405,12 @@ class ArrivalGatekeeper(Page):
             player.participant.vars.update({'screened_out': True, 'is_ghost': True, 'screenout_reason': 'timeout'})
             return
 
+        raw_label = str(player.participant.label)
+        player.participant.vars['raw_label_seen'] = raw_label
+
         p_label = str(player.participant.label or f"TEST_USER_{player.id_in_group}")
         player.participant.vars['prolific_id'] = p_label
+        player.participant.vars['processed_label'] = p_label
         
         for p in player.in_all_rounds():
             p.prolific_id = p_label
@@ -417,7 +422,7 @@ class ArrivalGatekeeper(Page):
 
         data = Constants.MAPPING[p_label]
         cat = data.get('category')
-        if len(cat) != 2:
+        if not cat or len(cat) != 2:
             for p in player.in_all_rounds(): p.screened_out = True
             player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
             return
@@ -480,7 +485,12 @@ class CapacityScreenout(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        return {'screenout_reason': player.participant.vars.get('screenout_reason', 'unknown')}
+        return {
+            'screenout_reason': player.participant.vars.get('screenout_reason', 'unknown'),
+            'raw_label': player.participant.vars.get('raw_label_seen', 'None'),
+            'processed_label': player.participant.vars.get('processed_label', 'None'),
+            'dict_keys': str(list(Constants.MAPPING.keys()))
+        }
 
 class FeedTaskGatekeeper(Page):
     @staticmethod
@@ -497,7 +507,7 @@ class FeedTaskGatekeeper(Page):
 
 class FeedTask_First(Page):
     form_model = 'player'
-    template_name = 'phase_2/FeedTask.html'
+    template_name = __name__ + '/FeedTask.html'
     
     @staticmethod
     def get_form_fields(player: Player):
@@ -529,7 +539,7 @@ class FeedTask_First(Page):
 
 class FeedTask_Second(Page):
     form_model = 'player'
-    template_name = 'phase_2/FeedTask.html'
+    template_name = __name__ + '/FeedTask.html'
     
     @staticmethod
     def get_form_fields(player: Player):
