@@ -234,17 +234,24 @@ class Player(BasePlayer):
 def get_status_vars(player: Player):
     all_rounds = player.in_all_rounds()
     completed_total = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
+    
     past_rounds = player.in_previous_rounds()
     completed_past = sum([1 for p in past_rounds if p.field_maybe_none('participated_this_round') == True])
-    missed_rounds_start = (player.round_number - 1) - completed_past
+    
+    rounds_available_past = player.round_number - 1
+    missed_rounds_start = rounds_available_past - completed_past
+    
+    shield_active = missed_rounds_start <= 0
+    chest_active = missed_rounds_start <= Constants.MAX_ALLOWED_MISSES
     
     usd_bonus_approx = Constants.BONUS_AMOUNT * 1.25
+    
     return {
         'current_round': player.round_number,
         'total_rounds': Constants.num_rounds,
         'completed_total': completed_total,
-        'shield_active': missed_rounds_start <= 0,
-        'chest_active': missed_rounds_start <= Constants.MAX_ALLOWED_MISSES,
+        'shield_active': shield_active,
+        'chest_active': chest_active,
         'bonus_amount': f"£{Constants.BONUS_AMOUNT:.2f} (approx. ${usd_bonus_approx:.2f})"
     }
 
@@ -388,7 +395,6 @@ class ArrivalGatekeeper(Page):
             player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
             return
 
-        # Store baseline answers from mapping JSON for the admin report
         player.participant.vars.update({
             'baseline_climate_opinion_1': data.get('climate_opinion_1'),
             'baseline_climate_opinion_2': data.get('climate_opinion_2'),
@@ -563,12 +569,18 @@ class EndOfDayWait(Page):
     @staticmethod
     def vars_for_template(player: Player):
         codes_json = os.environ.get('PROLIFIC_DAILY_CODES', '{}')
-        try: daily_codes = json.loads(codes_json)
-        except: daily_codes = {}
-        
+        try:
+            daily_codes = json.loads(codes_json)
+        except json.JSONDecodeError:
+            daily_codes = {}
+            
+        current_code = daily_codes.get(str(player.round_number), "MISSING_CODE")
+        daily_url = f"https://app.prolific.com/submissions/complete?cc={current_code}"
+        target = calculate_deadline(player.round_number)
+            
         vars_dict = {
-            'prolific_daily_url': f"https://app.prolific.com/submissions/complete?cc={daily_codes.get(str(player.round_number), 'MISSING')}",
-            'next_round_timestamp': calculate_deadline(player.round_number).isoformat()
+            'prolific_daily_url': daily_url,
+            'next_round_timestamp': target.isoformat()
         }
         vars_dict.update(get_status_vars(player))
         return vars_dict
@@ -582,24 +594,35 @@ class CompletionRedirect(Page):
     def vars_for_template(player: Player):
         all_rounds = player.in_all_rounds()
         completed_rounds = sum([1 for p in all_rounds if p.field_maybe_none('participated_this_round') == True])
-        missed = Constants.num_rounds - completed_rounds
+        missed_rounds = Constants.num_rounds - completed_rounds
         
-        final_base = Constants.FINAL_ROUND_PAY if player.participated_this_round else 0.00
-        bonus = Constants.BONUS_AMOUNT if missed <= Constants.MAX_ALLOWED_MISSES else 0.00
-        total = final_base + bonus
+        final_base_pay = Constants.FINAL_ROUND_PAY if player.participated_this_round else 0.00
+        bonus = Constants.BONUS_AMOUNT if missed_rounds <= Constants.MAX_ALLOWED_MISSES else 0.00
+        total_final_payment = final_base_pay + bonus
+        
+        lottery_eligible = (missed_rounds == 0)
         
         codes_json = os.environ.get('PROLIFIC_DAILY_CODES', '{}')
-        try: daily_codes = json.loads(codes_json)
-        except: daily_codes = {}
+        try:
+            daily_codes = json.loads(codes_json)
+        except json.JSONDecodeError:
+            daily_codes = {}
+        
+        current_code = daily_codes.get(str(player.round_number), "MISSING_CODE")
+        completion_url = f"https://app.prolific.com/submissions/complete?cc={current_code}"
+        
+        usd_base_approx = final_base_pay * 1.25
+        usd_bonus_approx = bonus * 1.25
+        usd_total_approx = total_final_payment * 1.25
         
         vars_dict = {
             'completed_rounds': completed_rounds,
-            'final_base_pay': f"£{final_base:.2f}",
-            'final_bonus_amount': f"£{bonus:.2f}",
-            'total_final_payment': f"£{total:.2f}",
+            'final_base_pay': f"£{final_base_pay:.2f} (approx. ${usd_base_approx:.2f})",
+            'final_bonus_amount': f"£{bonus:.2f} (approx. ${usd_bonus_approx:.2f})",
+            'total_final_payment': f"£{total_final_payment:.2f} (approx. ${usd_total_approx:.2f})",
             'earned_bonus': bonus > 0,
-            'lottery_eligible': (missed == 0),
-            'completion_url': f"https://app.prolific.com/submissions/complete?cc={daily_codes.get(str(player.round_number), 'MISSING')}",
+            'lottery_eligible': lottery_eligible,
+            'completion_url': completion_url,
             'lottery_ticket': player.participant.code.upper()
         }
         vars_dict.update(get_status_vars(player))
