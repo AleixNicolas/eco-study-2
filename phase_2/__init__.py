@@ -18,7 +18,6 @@ class Constants(BaseConstants):
     
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
     
-    # Restored: Strictly enforces multiples of the group size
     players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
     
     PAY_PER_ROUND = 0.40
@@ -232,6 +231,7 @@ class Player(BasePlayer):
     imm_node_id = models.IntegerField(blank=True, null=True)
     
     climate_incoming_feed = models.LongStringField(initial="[]", blank=True)
+    climate_shown_ids = models.LongStringField(initial="[]", blank=True)
     climate_current_backlog = models.LongStringField(initial="{}", blank=True)
     climate_outgoing_shares = models.LongStringField(initial="[]", blank=True)
     climate_average_feed_size = models.FloatField(blank=True, null=True)
@@ -241,6 +241,7 @@ class Player(BasePlayer):
     climate_total_time_on_feed = models.FloatField(blank=True, null=True)
     
     imm_incoming_feed = models.LongStringField(initial="[]", blank=True)
+    imm_shown_ids = models.LongStringField(initial="[]", blank=True)
     imm_current_backlog = models.LongStringField(initial="{}", blank=True)
     imm_outgoing_shares = models.LongStringField(initial="[]", blank=True)
     imm_average_feed_size = models.FloatField(blank=True, null=True)
@@ -298,7 +299,6 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
     if baseline_key in Constants.NETWORK_DATA:
         baseline_data = Constants.NETWORK_DATA[baseline_key]
         neighbors = baseline_data.get('network', {}).get(node_str, [])
-        # Both topics use the exact same ID format from the generic 'starting_items' key
         starting_items = baseline_data.get('nodes', {}).get(node_str, {}).get('starting_items', [])
     
     new_items = {}
@@ -386,6 +386,7 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
     player.participant.vars[f'{topic_prefix}_backlog'] = backlog
     setattr(player, f'{topic_prefix}_current_backlog', json.dumps(backlog))
     setattr(player, f'{topic_prefix}_incoming_feed', json.dumps(feed_items))
+    setattr(player, f'{topic_prefix}_shown_ids', json.dumps(mapped_ids))
 
 def generate_feed_for_player(player: Player):
     if player.participant.vars.get('screened_out', False):
@@ -474,8 +475,10 @@ class ArrivalGatekeeper(Page):
                     'screened_out': False
                 })
             else:
-                for p in player.in_all_rounds(): p.screened_out = True
-                player.participant.vars.update({'screened_out': True, 'screenout_reason': 'network_full'})
+                for p in player.in_all_rounds(): 
+                    p.screened_out = True
+                    p.category = cat
+                player.participant.vars.update({'screened_out': True, 'screenout_reason': 'network_full', 'assigned_category': cat})
 
 class CapacityScreenout(Page):
     @staticmethod
@@ -512,7 +515,7 @@ class FeedTask_First(Page):
     
     @staticmethod
     def get_form_fields(player: Player):
-        prefix = 'climate' if player.topic_order == 'climate_first' else 'imm'
+        prefix = 'climate' if player.participant.vars.get('topic_order') == 'climate_first' else 'imm'
         return [f'{prefix}_outgoing_shares', f'{prefix}_average_feed_size', f'{prefix}_max_feed_size', 
                 f'{prefix}_average_pending_items', f'{prefix}_max_pending_items', f'{prefix}_total_time_on_feed']
     
@@ -522,7 +525,7 @@ class FeedTask_First(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        prefix = 'climate' if player.topic_order == 'climate_first' else 'imm'
+        prefix = 'climate' if player.participant.vars.get('topic_order') == 'climate_first' else 'imm'
         topic_display = "Climate" if prefix == 'climate' else "Immigration"
         vars_dict = {
             'step_indicator': 'Feed 1 of 2',
@@ -536,7 +539,7 @@ class FeedTask_First(Page):
 
     @staticmethod
     def js_vars(player: Player):
-        prefix = 'climate' if player.topic_order == 'climate_first' else 'imm'
+        prefix = 'climate' if player.participant.vars.get('topic_order') == 'climate_first' else 'imm'
         return {'incoming_feed': json.loads(player.field_maybe_none(f'{prefix}_incoming_feed') or "[]")}
 
 class FeedTask_Second(Page):
@@ -545,7 +548,7 @@ class FeedTask_Second(Page):
     
     @staticmethod
     def get_form_fields(player: Player):
-        prefix = 'imm' if player.topic_order == 'climate_first' else 'climate'
+        prefix = 'imm' if player.participant.vars.get('topic_order') == 'climate_first' else 'climate'
         return [f'{prefix}_outgoing_shares', f'{prefix}_average_feed_size', f'{prefix}_max_feed_size', 
                 f'{prefix}_average_pending_items', f'{prefix}_max_pending_items', f'{prefix}_total_time_on_feed']
     
@@ -555,7 +558,7 @@ class FeedTask_Second(Page):
 
     @staticmethod
     def vars_for_template(player: Player):
-        prefix = 'imm' if player.topic_order == 'climate_first' else 'climate'
+        prefix = 'imm' if player.participant.vars.get('topic_order') == 'climate_first' else 'climate'
         topic_display = "Climate" if prefix == 'climate' else "Immigration"
         vars_dict = {
             'step_indicator': 'Feed 2 of 2',
@@ -569,7 +572,7 @@ class FeedTask_Second(Page):
 
     @staticmethod
     def js_vars(player: Player):
-        prefix = 'imm' if player.topic_order == 'climate_first' else 'climate'
+        prefix = 'imm' if player.participant.vars.get('topic_order') == 'climate_first' else 'climate'
         return {'incoming_feed': json.loads(player.field_maybe_none(f'{prefix}_incoming_feed') or "[]")}
 
     @staticmethod
