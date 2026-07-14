@@ -7,8 +7,8 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 doc = """
-Phase 2: Dual-Topic (Climate & Immigration) 8-Day Asynchronous Network Experiment.
-Features: User-level counterbalancing, dual-node topologies, and strict atomic queuing.
+Phase 2: Dual-Topic (Climate & Immigration) Asynchronous Network Experiment.
+Features: 2D Category Queueing, perfect load balancing, and strict atomic updates.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -18,7 +18,8 @@ class Constants(BaseConstants):
     
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
     
-    players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 20))
+    # Represents the TOTAL participants allowed in the session
+    players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 40))
     
     PAY_PER_ROUND = 0.40
     FINAL_ROUND_PAY = 0.80
@@ -86,28 +87,41 @@ def creating_session(subsession: Subsession):
         mode = os.environ.get('NETWORK_MODE', 'segregated').lower()
         subsession.session.vars['network_mode'] = mode
         
-        network_size = Constants.players_per_group
-        half = network_size // 2
-
-        subsession.session.vars['queues'] = {
-            'segregated': {'climate_L': [], 'climate_R': [], 'imm_L': [], 'imm_R': []},
-            'integrated': {'climate_L': [], 'climate_R': [], 'imm_L': [], 'imm_R': []}
-        }
-
-        if mode in ['both', 'segregated']:
-            subsession.session.vars['queues']['segregated']['climate_L'] = list(range(0, half))
-            subsession.session.vars['queues']['segregated']['climate_R'] = list(range(half, network_size))
-            subsession.session.vars['queues']['segregated']['imm_L'] = list(range(0, half))
-            subsession.session.vars['queues']['segregated']['imm_R'] = list(range(half, network_size))
+        total_players = Constants.players_per_group
+        
+        if mode == 'both':
+            net_size = total_players // 2
+            treatments = ['segregated', 'integrated']
+        else:
+            net_size = total_players
+            treatments = [mode]
             
-        if mode in ['both', 'integrated']:
-            subsession.session.vars['queues']['integrated']['climate_L'] = list(range(0, half))
-            subsession.session.vars['queues']['integrated']['climate_R'] = list(range(half, network_size))
-            subsession.session.vars['queues']['integrated']['imm_L'] = list(range(0, half))
-            subsession.session.vars['queues']['integrated']['imm_R'] = list(range(half, network_size))
+        half = net_size // 2
+        quarter = net_size // 4
+
+        subsession.session.vars['queues'] = {}
+
+        for treatment in treatments:
+            # 1. Generate standard Left and Right node pools for both topics
+            c_l = list(range(0, half))
+            c_r = list(range(half, net_size))
+            i_l = list(range(0, half))
+            i_r = list(range(half, net_size))
             
-            for q_key in subsession.session.vars['queues']['integrated']:
-                random.shuffle(subsession.session.vars['queues']['integrated'][q_key])
+            # 2. Shuffle to prevent sequential node assignment
+            random.shuffle(c_l)
+            random.shuffle(c_r)
+            random.shuffle(i_l)
+            random.shuffle(i_r)
+            
+            # 3. Zip nodes into explicit 2D category pairs (Climate Node, Imm Node)
+            # This completely blocks categories from stealing seats from each other
+            subsession.session.vars['queues'][treatment] = {
+                'LL': list(zip(c_l[:quarter], i_l[:quarter])),
+                'LR': list(zip(c_l[quarter:], i_r[:quarter])),
+                'RL': list(zip(c_r[:quarter], i_l[quarter:])),
+                'RR': list(zip(c_r[quarter:], i_r[quarter:]))
+            }
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
@@ -424,7 +438,7 @@ class ArrivalGatekeeper(Page):
 
         data = Constants.MAPPING[p_label]
         cat = data.get('category')
-        if not cat or len(cat) != 2:
+        if not cat or cat not in ['LL', 'LR', 'RL', 'RR']:
             for p in player.in_all_rounds(): p.screened_out = True
             player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
             return
@@ -436,8 +450,6 @@ class ArrivalGatekeeper(Page):
             'baseline_imm_opinion_2': data.get('imm_opinion_2')
         })
 
-        climate_dir, imm_dir = cat[0], cat[1]
-        
         topic_order = random.choice(['climate_first', 'imm_first'])
         player.participant.vars['topic_order'] = topic_order
         for p in player.in_all_rounds(): p.topic_order = topic_order
@@ -450,15 +462,24 @@ class ArrivalGatekeeper(Page):
             mode = player.session.vars.get('network_mode', 'segregated')
             target_treatments = ['segregated', 'integrated'] if mode == 'both' else [mode]
             
+            best_treatment = None
+            max_seats = 0
+            
+            # Randomize treatment array to prevent chronological bias if seats are tied
+            random.shuffle(target_treatments)
+            
+            # Load Balancer: Pick the network with the MOST remaining seats for this specific category
             for treatment in target_treatments:
-                q_climate = player.session.vars['queues'][treatment][f'climate_{climate_dir}']
-                q_imm = player.session.vars['queues'][treatment][f'imm_{imm_dir}']
-                
-                if len(q_climate) > 0 and len(q_imm) > 0:
-                    assigned_treatment = treatment
-                    assigned_climate = q_climate.pop(0)
-                    assigned_imm = q_imm.pop(0)
-                    break
+                q_len = len(player.session.vars['queues'][treatment][cat])
+                if q_len > max_seats:
+                    max_seats = q_len
+                    best_treatment = treatment
+                    
+            if max_seats > 0 and best_treatment is not None:
+                assigned_treatment = best_treatment
+                seat = player.session.vars['queues'][best_treatment][cat].pop(0)
+                assigned_climate = seat[0]
+                assigned_imm = seat[1]
 
             if assigned_climate is not None and assigned_imm is not None:
                 for p in player.in_all_rounds():
