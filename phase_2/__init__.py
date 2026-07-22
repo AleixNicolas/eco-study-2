@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 doc = """
 Phase 2: Dual-Topic (Climate & Immigration) Asynchronous Network Experiment.
-Features: 2D Category Queueing, perfect load balancing, and strict atomic updates.
+Features: Dynamic 2D Category Queueing, perfect load balancing, and strict atomic updates.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -97,7 +97,15 @@ def creating_session(subsession: Subsession):
             treatments = [mode]
             
         half = net_size // 2
-        quarter = net_size // 4
+
+        # --- DYNAMIC CATEGORY ASSIGNMENT ---
+        # Get custom LL capacity from Heroku, defaulting to an even 25% split if not provided
+        default_quarter = net_size // 4
+        ll_capacity = int(os.environ.get('NETWORK_LL_CAPACITY', default_quarter))
+        
+        # Enforce mathematical limits (cannot be less than 0 or greater than half the network size)
+        ll_capacity = max(0, min(ll_capacity, half))
+        lr_capacity = half - ll_capacity
 
         subsession.session.vars['queues'] = {}
 
@@ -114,13 +122,12 @@ def creating_session(subsession: Subsession):
             random.shuffle(i_l)
             random.shuffle(i_r)
             
-            # 3. Zip nodes into explicit 2D category pairs (Climate Node, Imm Node)
-            # This completely blocks categories from stealing seats from each other
+            # 3. Zip nodes dynamically based on Heroku capacity vars
             subsession.session.vars['queues'][treatment] = {
-                'LL': list(zip(c_l[:quarter], i_l[:quarter])),
-                'LR': list(zip(c_l[quarter:], i_r[:quarter])),
-                'RL': list(zip(c_r[:quarter], i_l[quarter:])),
-                'RR': list(zip(c_r[quarter:], i_r[quarter:]))
+                'LL': list(zip(c_l[:ll_capacity], i_l[:ll_capacity])),
+                'RR': list(zip(c_r[:ll_capacity], i_r[:ll_capacity])),
+                'LR': list(zip(c_l[ll_capacity:], i_r[ll_capacity:])),
+                'RL': list(zip(c_r[ll_capacity:], i_l[ll_capacity:]))
             }
 
 def vars_for_admin_report(subsession: Subsession):
@@ -272,7 +279,6 @@ class Player(BasePlayer):
     satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal)
     clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the instructions?", widget=widgets.RadioSelectHorizontal)
     
-    # Replaced single echo_chamber with two specific fields
     climate_echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the Climate Policy feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
     imm_echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the Immigration feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
     
@@ -619,7 +625,6 @@ class FinalOpinions(Page):
 
 class FinalFeedback(Page):
     form_model = 'player'
-    # Updated to include both specific fields
     form_fields = ['satisfaction', 'clarity', 'climate_echo_chamber', 'imm_echo_chamber', 'final_comments']
     
     @staticmethod
