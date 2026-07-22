@@ -6,9 +6,23 @@ import csv
 import threading
 from datetime import datetime, timedelta, timezone
 
+# --- HEROKU CONFIGURATION (Evaluated at server startup) ---
+NETWORK_MODE = os.environ.get('NETWORK_MODE', 'both').lower()
+
+# The size of ONE treatment. (e.g., 20 means it will always look for network_map_20.json)
+TREATMENT_SIZE = int(os.environ.get('NETWORK_TREATMENT_SIZE', 40))
+
+# Calculate total players needed for the oTree session based on mode
+NUM_NETWORKS = 2 if NETWORK_MODE == 'both' else 1
+TOTAL_SESSION_PLAYERS = TREATMENT_SIZE * NUM_NETWORKS
+
+raw_ll_capacity = os.environ.get('NETWORK_LL_CAPACITY')
+NETWORK_LL_CAPACITY = int(raw_ll_capacity) if raw_ll_capacity else None
+
 doc = """
 Phase 2: Dual-Topic (Climate & Immigration) Asynchronous Network Experiment.
-Features: Dynamic 2D Category Queueing, perfect load balancing, and strict atomic updates.
+Features: Dynamic 2D Category Queueing, perfect load balancing, strict atomic updates, 
+and automatic dynamic map routing based on a single treatment size variable.
 """
 
 SYSTEM_LOCK = threading.Lock()
@@ -18,8 +32,8 @@ class Constants(BaseConstants):
     
     num_rounds = int(os.environ.get('NETWORK_NUM_ROUNDS', 8))
     
-    # Represents the TOTAL participants allowed in the session
-    players_per_group = int(os.environ.get('NETWORK_PLAYERS_PER_GROUP', 40))
+    # Represents the TOTAL participants allowed in the session dynamically
+    players_per_group = TOTAL_SESSION_PLAYERS
     
     PAY_PER_ROUND = 0.40
     FINAL_ROUND_PAY = 0.80
@@ -27,12 +41,20 @@ class Constants(BaseConstants):
     LOTTERY_AMOUNT = 80.00
     MAX_ALLOWED_MISSES = 1
     
-    json_path = os.path.join(os.path.dirname(__file__), 'network_map.json')
+    # --- DYNAMIC MAP SELECTION ---
+    map_filename = f'network_map_{TREATMENT_SIZE}.json'
+    json_path = os.path.join(os.path.dirname(__file__), map_filename)
+    
     if os.path.exists(json_path):
         with open(json_path, encoding='utf-8') as f:
             NETWORK_DATA = json.load(f)
+        print(f"\n--- MAP LOAD SUCCESS ---")
+        print(f"Loaded {map_filename} for a Treatment Size of {TREATMENT_SIZE}.")
+        print(f"Mode: {NETWORK_MODE.upper()} -> Total Session Size: {TOTAL_SESSION_PLAYERS}")
     else:
         NETWORK_DATA = {}
+        print(f"\n--- CRITICAL MAP ERROR ---")
+        print(f"Required map {map_filename} NOT FOUND in directory!")
 
     def load_news(filename):
         path = os.path.join(os.path.dirname(__file__), filename)
@@ -84,37 +106,26 @@ class Subsession(BaseSubsession):
 
 def creating_session(subsession: Subsession):
     if subsession.round_number == 1:
-        mode = os.environ.get('NETWORK_MODE', 'segregated').lower()
-        subsession.session.vars['network_mode'] = mode
+        subsession.session.vars['network_mode'] = NETWORK_MODE
         
-        total_players = Constants.players_per_group
-        
-        if mode == 'both':
-            net_size = total_players // 2
-            treatments = ['segregated', 'integrated']
-        else:
-            net_size = total_players
-            treatments = [mode]
-            
-        half = net_size // 2
+        half = TREATMENT_SIZE // 2
 
         # --- DYNAMIC CATEGORY ASSIGNMENT ---
-        # Get custom LL capacity from Heroku, defaulting to an even 25% split if not provided
-        default_quarter = net_size // 4
-        ll_capacity = int(os.environ.get('NETWORK_LL_CAPACITY', default_quarter))
+        # Get custom LL capacity from Heroku globally, defaulting to an even 25% split if not provided
+        ll_capacity = NETWORK_LL_CAPACITY if NETWORK_LL_CAPACITY is not None else (TREATMENT_SIZE // 4)
         
         # Enforce mathematical limits (cannot be less than 0 or greater than half the network size)
         ll_capacity = max(0, min(ll_capacity, half))
-        lr_capacity = half - ll_capacity
 
         subsession.session.vars['queues'] = {}
+        treatments = ['segregated', 'integrated'] if NETWORK_MODE == 'both' else [NETWORK_MODE]
 
         for treatment in treatments:
-            # 1. Generate standard Left and Right node pools for both topics
+            # 1. Generate standard Left and Right node pools for both topics based on TREATMENT_SIZE
             c_l = list(range(0, half))
-            c_r = list(range(half, net_size))
+            c_r = list(range(half, TREATMENT_SIZE))
             i_l = list(range(0, half))
-            i_r = list(range(half, net_size))
+            i_r = list(range(half, TREATMENT_SIZE))
             
             # 2. Shuffle to prevent sequential node assignment
             random.shuffle(c_l)
@@ -129,6 +140,13 @@ def creating_session(subsession: Subsession):
                 'LR': list(zip(c_l[ll_capacity:], i_r[ll_capacity:])),
                 'RL': list(zip(c_r[ll_capacity:], i_l[ll_capacity:]))
             }
+            
+        print(f"\n--- SESSION INITIALIZED ({NETWORK_MODE.upper()}) ---")
+        print(f"Target Map: {Constants.map_filename}")
+        print(f"Total Session Size: {TOTAL_SESSION_PLAYERS}")
+        print(f"Treatment Size: {TREATMENT_SIZE}")
+        print(f"LL/RR Capacity per network: {ll_capacity}")
+        print(f"LR/RL Capacity per network: {half - ll_capacity}\n")
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
