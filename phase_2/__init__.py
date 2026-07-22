@@ -58,10 +58,10 @@ class Constants(BaseConstants):
         MAPPING = {}
 
     QUESTIONS = { 
-        'climate_opinion_1': {'text': "To what extent do you favor transitioning away from fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'climate_opinion_2': {'text': "To what extent do you favor increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'imm_opinion_1': {'text': "To what extent do you favor increasing the number of legal immigrants allowed?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'imm_opinion_2': {'text': "To what extent do you favor providing a path to citizenship for undocumented immigrants?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
+        'climate_opinion_1': {'text': "To what extent do you favor or oppose transitioning the country away from fossil fuels toward renewable energy?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'climate_opinion_2': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'imm_opinion_1': {'text': "To what extent do you favor reducing federal immigration enforcement?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'imm_opinion_2': {'text': "To what extent do you favor the government providing immigrants a pathway to legal status over deportation?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
     }
 
 def calculate_deadline(round_number):
@@ -271,7 +271,11 @@ class Player(BasePlayer):
     
     satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal)
     clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the instructions?", widget=widgets.RadioSelectHorizontal)
-    echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the feeds aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
+    
+    # Replaced single echo_chamber with two specific fields
+    climate_echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the Climate Policy feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
+    imm_echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the Immigration feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
+    
     final_comments = models.LongStringField(label="Please include any feedback or concerns you may have.", blank=True)
 
 def get_status_vars(player: Player):
@@ -615,7 +619,8 @@ class FinalOpinions(Page):
 
 class FinalFeedback(Page):
     form_model = 'player'
-    form_fields = ['satisfaction', 'clarity', 'echo_chamber', 'final_comments']
+    # Updated to include both specific fields
+    form_fields = ['satisfaction', 'clarity', 'climate_echo_chamber', 'imm_echo_chamber', 'final_comments']
     
     @staticmethod
     def is_displayed(player: Player):

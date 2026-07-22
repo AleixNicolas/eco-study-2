@@ -5,19 +5,28 @@
 
     <style>
         .feedback-section { margin-bottom: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; }
+        .echo-chamber-question { margin-bottom: 25px; }
+        .echo-chamber-question:last-child { margin-bottom: 0; }
     </style>
 
     <p class="mb-4">We value your feedback to help us improve future iterations of this platform.</p>
 
     <div class="feedback-section">
         <h5 class="mb-3">Platform Experience</h5>
-        <div class="mb-4">{{ formfield 'satisfaction' }}<small class="text-muted">1 = Very Dissatisfied, 5 = Very Satisfied</small></div>
-        <div>{{ formfield 'clarity' }}<small class="text-muted">1 = Very Unclear, 5 = Very Clear</small></div>
+        <div class="mb-4">{{ formfield 'satisfaction' }}<small class="text-muted d-block mt-n2">1 = Very Dissatisfied, 5 = Very Satisfied</small></div>
+        <div>{{ formfield 'clarity' }}<small class="text-muted d-block mt-n2">1 = Very Unclear, 5 = Very Clear</small></div>
     </div>
 
     <div class="feedback-section">
         <h5 class="mb-3">Network Perception</h5>
-        <div class="mb-4">{{ formfield 'echo_chamber' }}<small class="text-muted">1 = Not at all, 5 = Completely</small></div>
+        <div class="echo-chamber-question">
+            {{ formfield 'climate_echo_chamber' }}
+            <small class="text-muted d-block mt-n2">1 = Not at all, 5 = Completely</small>
+        </div>
+        <div class="echo-chamber-question">
+            {{ formfield 'imm_echo_chamber' }}
+            <small class="text-muted d-block mt-n2">1 = Not at all, 5 = Completely</small>
+        </div>
     </div>
 
     <div class="feedback-section">
