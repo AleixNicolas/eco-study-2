@@ -82,8 +82,8 @@ class Constants(BaseConstants):
     QUESTIONS = { 
         'climate_opinion_1': {'text': "To what extent do you favor or oppose transitioning the country away from fossil fuels toward renewable energy?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
         'climate_opinion_2': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'imm_opinion_1': {'text': "To what extent do you favor reducing federal immigration enforcement?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'imm_opinion_2': {'text': "To what extent do you favor the government providing immigrants a pathway to legal status over deportation?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
+        'imm_opinion_1': {'text': "To what extent do you favor or oppose the United States adopting a  more welcoming stance toward immigrants?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'imm_opinion_2': {'text': "To what extent do you favor or oppose the government providing immigrants a pathway to legal status over deportation?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
     }
 
 def calculate_deadline(round_number):
