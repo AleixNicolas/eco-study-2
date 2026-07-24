@@ -35,9 +35,9 @@ class Constants(BaseConstants):
     # Represents the TOTAL participants allowed in the session dynamically
     players_per_group = TOTAL_SESSION_PLAYERS
     
-    PAY_PER_ROUND = 0.40
-    FINAL_ROUND_PAY = 0.80
-    BONUS_AMOUNT = 4.00
+    PAY_PER_ROUND = 0.80
+    FINAL_ROUND_PAY = 1.20
+    BONUS_AMOUNT = 3.00
     LOTTERY_AMOUNT = 80.00
     MAX_ALLOWED_MISSES = 1
     
