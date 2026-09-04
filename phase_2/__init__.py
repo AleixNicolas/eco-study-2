@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 
 # --- HEROKU CONFIGURATION (Evaluated at server startup) ---
 NETWORK_MODE = os.environ.get('NETWORK_MODE', 'both').lower()
+# Base topic can be: 'dual', 'climate', or 'immigration'
+NETWORK_BASE_TOPIC = os.environ.get('NETWORK_BASE_TOPIC', 'dual').lower()
 
 # The size of ONE treatment. (e.g., 20 means it will always look for network_map_20.json)
 TREATMENT_SIZE = int(os.environ.get('NETWORK_TREATMENT_SIZE', 40))
@@ -50,7 +52,7 @@ class Constants(BaseConstants):
             NETWORK_DATA = json.load(f)
         print(f"\n--- MAP LOAD SUCCESS ---")
         print(f"Loaded {map_filename} for a Treatment Size of {TREATMENT_SIZE}.")
-        print(f"Mode: {NETWORK_MODE.upper()} -> Total Session Size: {TOTAL_SESSION_PLAYERS}")
+        print(f"Mode: {NETWORK_MODE.upper()} | Base Topic: {NETWORK_BASE_TOPIC.upper()} -> Total Session Size: {TOTAL_SESSION_PLAYERS}")
     else:
         NETWORK_DATA = {}
         print(f"\n--- CRITICAL MAP ERROR ---")
@@ -82,8 +84,8 @@ class Constants(BaseConstants):
     QUESTIONS = { 
         'climate_opinion_1': {'text': "To what extent do you favor or oppose transitioning the country away from fossil fuels toward renewable energy?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
         'climate_opinion_2': {'text': "To what extent do you favor or oppose increasing taxes on fossil fuels?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'imm_opinion_1': {'text': "To what extent do you favor or oppose the United States adopting a  more welcoming stance toward immigrants?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
-        'imm_opinion_2': {'text': "To what extent do you favor or oppose the government providing immigrants a pathway to legal status over deportation?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
+        'imm_opinion_1': {'text': "To what extent do you favor policies aimed at reducing immigration into the United States?", 'left': "Strongly Oppose", 'right': "Strongly Favor"}, 
+        'imm_opinion_2': {'text': "To what extent do you favor deportation over providing immigrants a pathway to legal status?", 'left': "Strongly Oppose", 'right': "Strongly Favor"} 
     }
 
 def calculate_deadline(round_number):
@@ -109,14 +111,6 @@ def creating_session(subsession: Subsession):
         subsession.session.vars['network_mode'] = NETWORK_MODE
         
         half = TREATMENT_SIZE // 2
-
-        # --- DYNAMIC CATEGORY ASSIGNMENT ---
-        # Get custom LL capacity from Heroku globally, defaulting to an even 25% split if not provided
-        ll_capacity = NETWORK_LL_CAPACITY if NETWORK_LL_CAPACITY is not None else (TREATMENT_SIZE // 4)
-        
-        # Enforce mathematical limits (cannot be less than 0 or greater than half the network size)
-        ll_capacity = max(0, min(ll_capacity, half))
-
         subsession.session.vars['queues'] = {}
         treatments = ['segregated', 'integrated'] if NETWORK_MODE == 'both' else [NETWORK_MODE]
 
@@ -133,20 +127,34 @@ def creating_session(subsession: Subsession):
             random.shuffle(i_l)
             random.shuffle(i_r)
             
-            # 3. Zip nodes dynamically based on Heroku capacity vars
-            subsession.session.vars['queues'][treatment] = {
-                'LL': list(zip(c_l[:ll_capacity], i_l[:ll_capacity])),
-                'RR': list(zip(c_r[:ll_capacity], i_r[:ll_capacity])),
-                'LR': list(zip(c_l[ll_capacity:], i_r[ll_capacity:])),
-                'RL': list(zip(c_r[ll_capacity:], i_l[ll_capacity:]))
-            }
+            # 3. Dynamic Assignment Setup based on NETWORK_BASE_TOPIC
+            if NETWORK_BASE_TOPIC == 'climate':
+                subsession.session.vars['queues'][treatment] = {
+                    'L': c_l,
+                    'R': c_r
+                }
+            elif NETWORK_BASE_TOPIC == 'immigration':
+                subsession.session.vars['queues'][treatment] = {
+                    'L': i_l,
+                    'R': i_r
+                }
+            else:
+                # Default Dual logic
+                ll_capacity = NETWORK_LL_CAPACITY if NETWORK_LL_CAPACITY is not None else (TREATMENT_SIZE // 4)
+                ll_capacity = max(0, min(ll_capacity, half))
+                
+                subsession.session.vars['queues'][treatment] = {
+                    'LL': list(zip(c_l[:ll_capacity], i_l[:ll_capacity])),
+                    'RR': list(zip(c_r[:ll_capacity], i_r[:ll_capacity])),
+                    'LR': list(zip(c_l[ll_capacity:], i_r[ll_capacity:])),
+                    'RL': list(zip(c_r[ll_capacity:], i_l[ll_capacity:]))
+                }
             
         print(f"\n--- SESSION INITIALIZED ({NETWORK_MODE.upper()}) ---")
         print(f"Target Map: {Constants.map_filename}")
         print(f"Total Session Size: {TOTAL_SESSION_PLAYERS}")
         print(f"Treatment Size: {TREATMENT_SIZE}")
-        print(f"LL/RR Capacity per network: {ll_capacity}")
-        print(f"LR/RL Capacity per network: {half - ll_capacity}\n")
+        print(f"Network Base Topic: {NETWORK_BASE_TOPIC.upper()}\n")
 
 def vars_for_admin_report(subsession: Subsession):
     players = subsession.get_players()
@@ -164,11 +172,16 @@ def vars_for_admin_report(subsession: Subsession):
     for treatment in treatments:
         t_players = [p for p in valid_players if p.participant.vars.get('network_treatment', 'segregated') == treatment]
         
+        # Dynamically find all categories populated in this treatment to support C nodes gracefully
+        treatment_categories = sorted(list(set([p.participant.vars.get('assigned_category') for p in t_players if p.participant.vars.get('assigned_category')])))
+        if not treatment_categories:
+            treatment_categories = ['LL', 'LR', 'RL', 'RR']
+            
         for topic in ['climate', 'imm']:
             feed_lean_percentages[topic][treatment] = {}
             avg_opinion_change[topic][treatment] = {}
             
-            for cat in ['LL', 'LR', 'RL', 'RR']:
+            for cat in treatment_categories:
                 cat_players = [p for p in t_players if p.participant.vars.get('assigned_category') == cat]
                 leaning_counts = {}
                 total_articles = 0
@@ -466,10 +479,34 @@ class ArrivalGatekeeper(Page):
 
         data = Constants.MAPPING[p_label]
         cat = data.get('category')
-        if not cat or cat not in ['LL', 'LR', 'RL', 'RR']:
+        
+        if not cat or len(cat) != 2:
             for p in player.in_all_rounds(): p.screened_out = True
             player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
             return
+
+        # --- DYNAMIC TARGET QUEUE VALIDATION ---
+        target_queue_key = None
+        if NETWORK_BASE_TOPIC == 'climate':
+            if cat[0] not in ['L', 'R']:
+                for p in player.in_all_rounds(): p.screened_out = True
+                player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
+                return
+            target_queue_key = cat[0]
+            
+        elif NETWORK_BASE_TOPIC == 'immigration':
+            if cat[1] not in ['L', 'R']:
+                for p in player.in_all_rounds(): p.screened_out = True
+                player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
+                return
+            target_queue_key = cat[1]
+            
+        else:
+            if cat not in ['LL', 'LR', 'RL', 'RR']:
+                for p in player.in_all_rounds(): p.screened_out = True
+                player.participant.vars.update({'screened_out': True, 'screenout_reason': 'invalid_category_format'})
+                return
+            target_queue_key = cat
 
         player.participant.vars.update({
             'baseline_climate_opinion_1': data.get('climate_opinion_1'),
@@ -496,18 +533,24 @@ class ArrivalGatekeeper(Page):
             # Randomize treatment array to prevent chronological bias if seats are tied
             random.shuffle(target_treatments)
             
-            # Load Balancer: Pick the network with the MOST remaining seats for this specific category
+            # Load Balancer: Pick the network with the MOST remaining seats for this specific category target
             for treatment in target_treatments:
-                q_len = len(player.session.vars['queues'][treatment][cat])
+                q_len = len(player.session.vars['queues'][treatment][target_queue_key])
                 if q_len > max_seats:
                     max_seats = q_len
                     best_treatment = treatment
                     
             if max_seats > 0 and best_treatment is not None:
                 assigned_treatment = best_treatment
-                seat = player.session.vars['queues'][best_treatment][cat].pop(0)
-                assigned_climate = seat[0]
-                assigned_imm = seat[1]
+                popped_val = player.session.vars['queues'][best_treatment][target_queue_key].pop(0)
+                
+                # Assign Nodes Based on the Mode Structure
+                if NETWORK_BASE_TOPIC == 'dual':
+                    assigned_climate = popped_val[0]
+                    assigned_imm = popped_val[1]
+                else:
+                    assigned_climate = popped_val
+                    assigned_imm = popped_val
 
             if assigned_climate is not None and assigned_imm is not None:
                 for p in player.in_all_rounds():
