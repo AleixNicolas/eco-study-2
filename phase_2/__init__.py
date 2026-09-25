@@ -110,18 +110,33 @@ def creating_session(subsession: Subsession):
     if subsession.round_number == 1:
         subsession.session.vars['network_mode'] = NETWORK_MODE
         
-        half = TREATMENT_SIZE // 2
         subsession.session.vars['queues'] = {}
         treatments = ['segregated', 'integrated'] if NETWORK_MODE == 'both' else [NETWORK_MODE]
 
         for treatment in treatments:
-            # 1. Generate standard Left and Right node pools for both topics based on TREATMENT_SIZE
-            c_l = list(range(0, half))
-            c_r = list(range(half, TREATMENT_SIZE))
-            i_l = list(range(0, half))
-            i_r = list(range(half, TREATMENT_SIZE))
+            # 1. Dynamically read node opinions from the JSON map
+            baseline_key = f"{treatment}_baseline"
+            nodes_data = Constants.NETWORK_DATA.get(baseline_key, {}).get('nodes', {})
             
-            # 2. Shuffle to prevent sequential node assignment
+            pool_l = []
+            pool_r = []
+            
+            # Sort node IDs based on their JSON opinion value
+            for i in range(TREATMENT_SIZE):
+                node_str = str(i)
+                if node_str in nodes_data:
+                    op = nodes_data[node_str].get('opinion', 0.5)
+                    if op < 0.5:
+                        pool_l.append(i)
+                    elif op > 0.5:
+                        pool_r.append(i)
+            
+            # 2. Create independent copies and shuffle to prevent sequential node assignment
+            c_l = pool_l.copy()
+            c_r = pool_r.copy()
+            i_l = pool_l.copy()
+            i_r = pool_r.copy()
+            
             random.shuffle(c_l)
             random.shuffle(c_r)
             random.shuffle(i_l)
@@ -140,6 +155,7 @@ def creating_session(subsession: Subsession):
                 }
             else:
                 # Default Dual logic
+                half = TREATMENT_SIZE // 2
                 ll_capacity = NETWORK_LL_CAPACITY if NETWORK_LL_CAPACITY is not None else (TREATMENT_SIZE // 4)
                 ll_capacity = max(0, min(ll_capacity, half))
                 
