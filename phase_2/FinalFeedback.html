@@ -13,19 +13,39 @@
 
     <div class="feedback-section">
         <h5 class="mb-3">Platform Experience</h5>
-        <div class="mb-4">{{ formfield 'satisfaction' }}<small class="text-muted d-block mt-n2">1 = Very Dissatisfied, 5 = Very Satisfied</small></div>
-        <div>{{ formfield 'clarity' }}<small class="text-muted d-block mt-n2">1 = Very Unclear, 5 = Very Clear</small></div>
+        <div class="mb-4">
+            {{ formfield 'satisfaction' }}
+            <small class="text-muted d-block mt-n2">1 = Very Dissatisfied, 5 = Very Satisfied</small>
+        </div>
+        <div>
+            {{ formfield 'clarity' }}
+            <small class="text-muted d-block mt-n2">1 = Very Unclear, 5 = Very Clear</small>
+        </div>
     </div>
 
     <div class="feedback-section">
         <h5 class="mb-3">Opinion Perception</h5>
+        
         <div class="echo-chamber-question">
-            {{ formfield 'climate_echo_chamber' }}
-            <small class="text-muted d-block mt-n2">1 = Not at all, 5 = Completely</small>
+            {{ formfield 'climate_perceived_slant' }}
+            <small class="text-muted d-block mt-n2">1 = Strongly against climate action, 3 = Balanced, 5 = Strongly in favour of climate action</small>
         </div>
+        
         <div class="echo-chamber-question">
-            {{ formfield 'imm_echo_chamber' }}
-            <small class="text-muted d-block mt-n2">1 = Not at all, 5 = Completely</small>
+            {{ formfield 'climate_perceived_agreement' }}
+            <small class="text-muted d-block mt-n2">1 = None, 5 = All</small>
+        </div>
+        
+        <hr class="my-4">
+        
+        <div class="echo-chamber-question">
+            {{ formfield 'imm_perceived_slant' }}
+            <small class="text-muted d-block mt-n2">1 = Strongly against immigration, 3 = Balanced, 5 = Strongly in favour of immigration</small>
+        </div>
+        
+        <div class="echo-chamber-question">
+            {{ formfield 'imm_perceived_agreement' }}
+            <small class="text-muted d-block mt-n2">1 = None, 5 = All</small>
         </div>
     </div>
 

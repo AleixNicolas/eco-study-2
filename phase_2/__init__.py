@@ -326,8 +326,11 @@ class Player(BasePlayer):
     satisfaction = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, how satisfied were you with your experience?", widget=widgets.RadioSelectHorizontal)
     clarity = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How clear were the instructions?", widget=widgets.RadioSelectHorizontal)
     
-    climate_echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the Climate Policy feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
-    imm_echo_chamber = models.IntegerField(choices=[1, 2, 3, 4, 5], label="To what extent do you feel the Immigration feed aligned with your own opinions?", widget=widgets.RadioSelectHorizontal)
+    climate_perceived_slant = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, the news about Climate Policy you saw in this study was:", widget=widgets.RadioSelectHorizontal)
+    imm_perceived_slant = models.IntegerField(choices=[1, 2, 3, 4, 5], label="Overall, the news about Immigration you saw in this study was:", widget=widgets.RadioSelectHorizontal)
+    
+    climate_perceived_agreement = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How much of the Climate Policy news you saw agreed with your own views?", widget=widgets.RadioSelectHorizontal)
+    imm_perceived_agreement = models.IntegerField(choices=[1, 2, 3, 4, 5], label="How much of the Immigration news you saw agreed with your own views?", widget=widgets.RadioSelectHorizontal)
     
     final_comments = models.LongStringField(label="Please include any feedback or concerns you may have.", blank=True)
 
@@ -361,8 +364,10 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
     node_id = player.participant.vars.get(f'{topic_prefix}_node_id')
     node_str = str(node_id)
     
-    backlog = player.participant.vars.get(f'{topic_prefix}_backlog', {})
+    # 1. Load Histories
     shared_history = player.participant.vars.get(f'{topic_prefix}_shared_history', set())
+    seen_history = player.participant.vars.get(f'{topic_prefix}_seen_history', set())
+    backlog = player.participant.vars.get(f'{topic_prefix}_backlog', {})  # Dictionary of {item_id: weight}
     
     neighbors = []
     starting_items = []
@@ -374,10 +379,12 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
     
     new_items = {}
     
+    # 2. Gather Previous Round Data
     if player.round_number > 1:
         prev_subsession = player.subsession.in_round(player.round_number - 1)
         prev_players = [p for p in prev_subsession.get_players() if p.participant.vars.get('network_treatment') == treatment]
         
+        # Update user's shared and seen history from LAST round
         this_player_prev = next((p for p in prev_players if p.participant.vars.get(f'{topic_prefix}_node_id') == node_id), None)
         if this_player_prev:
             shares_data = this_player_prev.field_maybe_none(f'{topic_prefix}_outgoing_shares')
@@ -386,8 +393,18 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
                     for item_id in json.loads(shares_data):
                         shared_history.add(str(item_id).strip().lower())
                 except: pass
+            
+            shown_data = this_player_prev.field_maybe_none(f'{topic_prefix}_shown_ids')
+            if shown_data:
+                try:
+                    for item_id in json.loads(shown_data):
+                        seen_history.add(str(item_id).strip().lower())
+                except: pass
+                
         player.participant.vars[f'{topic_prefix}_shared_history'] = shared_history
+        player.participant.vars[f'{topic_prefix}_seen_history'] = seen_history
 
+        # Gather neighbor shares from LAST round (Frequency Weighted)
         for n_id in neighbors:
             n_player = next((p for p in prev_players if p.participant.vars.get(f'{topic_prefix}_node_id') == n_id), None)
             if n_player:
@@ -400,59 +417,60 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
                                 new_items[str_id] = new_items.get(str_id, 0) + 1
                     except: pass
 
+    # Clean backlog of items the user has now shared
     backlog = {str(k).strip().lower(): v for k, v in backlog.items() if str(k).strip().lower() not in shared_history}
+    
     feed_item_ids = []
-
+    
     if player.round_number == 1 and starting_items:
         feed_item_ids = [str(item).strip().lower() for item in starting_items]
     else:
-        pool_new = list(new_items.keys())
-        weights_new = [new_items[k] for k in pool_new]
-        while len(feed_item_ids) < 4 and pool_new:
-            choice = random.choices(pool_new, weights=weights_new, k=1)[0]
-            feed_item_ids.append(choice)
-            idx = pool_new.index(choice)
-            pool_new.pop(idx)
-            weights_new.pop(idx)
-            
-        if len(feed_item_ids) < 4:
-            pool_old = [k for k in backlog.keys() if k not in feed_item_ids]
-            weights_old = [backlog[k] for k in pool_old]
-            while len(feed_item_ids) < 4 and pool_old:
-                choice = random.choices(pool_old, weights=weights_old, k=1)[0]
-                feed_item_ids.append(choice)
-                idx = pool_old.index(choice)
-                pool_old.pop(idx)
-                weights_old.pop(idx)
+        # 3. Categorize into Strict Priorities (Retaining Weights)
+        p1_pool = {k: v for k, v in new_items.items() if k not in seen_history}  # Unseen last round
+        p2_pool = {k: v for k, v in backlog.items() if k not in seen_history}    # Unseen past rounds
+        p3_pool = {k: v for k, v in new_items.items() if k in seen_history}      # Seen last round
+        p4_pool = {k: v for k, v in backlog.items() if k in seen_history}        # Seen past rounds
         
+        # Helper to draw with weights without replacement
+        def draw_from_weighted_pool(pool_dict, needed):
+            drawn = []
+            pool_keys = list(pool_dict.keys())
+            pool_weights = list(pool_dict.values())
+            while len(drawn) < needed and pool_keys:
+                choice = random.choices(pool_keys, weights=pool_weights, k=1)[0]
+                drawn.append(choice)
+                idx = pool_keys.index(choice)
+                pool_keys.pop(idx)
+                pool_weights.pop(idx)
+            return drawn
+        
+        # Execute Waterfall Selection
+        feed_item_ids.extend(draw_from_weighted_pool(p1_pool, 4 - len(feed_item_ids)))
+        feed_item_ids.extend(draw_from_weighted_pool(p2_pool, 4 - len(feed_item_ids)))
+        feed_item_ids.extend(draw_from_weighted_pool(p3_pool, 4 - len(feed_item_ids)))
+        feed_item_ids.extend(draw_from_weighted_pool(p4_pool, 4 - len(feed_item_ids)))
+
+        # Add new items to backlog for future rounds
         for k, v in new_items.items():
             clean_key = str(k).strip().lower()
             backlog[clean_key] = backlog.get(clean_key, 0) + v
 
+    # 4. Priority 5: General Pool (If still < 4)
+    if len(feed_item_ids) < 4:
+        needed = 4 - len(feed_item_ids)
+        all_ids = [str(item.get('id', '')).strip().lower() for item in news_db if item.get('id')]
+        available_pool = [i for i in all_ids if i not in feed_item_ids and i not in seen_history and i not in shared_history and i != '']
+        if available_pool:
+            feed_item_ids.extend(random.sample(available_pool, min(needed, len(available_pool))))
+
+    # 5. Map IDs to actual item dictionaries
     feed_items = []
     mapped_ids = []
-    
     for item_id in feed_item_ids:
         item_data = next((item for item in news_db if str(item.get('id', '')).strip().lower() == item_id), None)
         if item_data:
             feed_items.append(item_data)
             mapped_ids.append(item_id)
-            
-    if len(feed_items) < 4:
-        needed = 4 - len(feed_items)
-        all_ids = [str(item.get('id', '')).strip().lower() for item in news_db if item.get('id')]
-        available_pool = [i for i in all_ids if i not in mapped_ids and i not in shared_history and i != '']
-        if available_pool:
-            padding_ids = random.sample(available_pool, min(needed, len(available_pool)))
-            for pad_id in padding_ids:
-                pad_data = next((item for item in news_db if str(item.get('id', '')).strip().lower() == pad_id), None)
-                if pad_data:
-                    feed_items.append(pad_data)
-                    mapped_ids.append(pad_id)
-
-    for item_id in mapped_ids:
-        if item_id in backlog:
-            del backlog[item_id]
 
     player.participant.vars[f'{topic_prefix}_backlog'] = backlog
     setattr(player, f'{topic_prefix}_current_backlog', json.dumps(backlog))
@@ -702,7 +720,7 @@ class FinalOpinions(Page):
 
 class FinalFeedback(Page):
     form_model = 'player'
-    form_fields = ['satisfaction', 'clarity', 'climate_echo_chamber', 'imm_echo_chamber', 'final_comments']
+    form_fields = ['satisfaction', 'clarity', 'climate_perceived_slant', 'climate_perceived_agreement', 'imm_perceived_slant', 'imm_perceived_agreement', 'final_comments']
     
     @staticmethod
     def is_displayed(player: Player):
