@@ -385,7 +385,7 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
         prev_players = [p for p in prev_subsession.get_players() if p.participant.vars.get('network_treatment') == treatment]
         
         # Update user's shared and seen history from LAST round
-        this_player_prev = next((p for p in prev_players if p.participant.vars.get(f'{topic_prefix}_node_id') == node_id), None)
+        this_player_prev = next((p for p in prev_players if p.participant.vars.get(f'{topic_prefix}_node_id') == int(node_id)), None)
         if this_player_prev:
             shares_data = this_player_prev.field_maybe_none(f'{topic_prefix}_outgoing_shares')
             if shares_data:
@@ -406,7 +406,7 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
 
         # Gather neighbor shares from LAST round (Frequency Weighted)
         for n_id in neighbors:
-            n_player = next((p for p in prev_players if p.participant.vars.get(f'{topic_prefix}_node_id') == n_id), None)
+            n_player = next((p for p in prev_players if p.participant.vars.get(f'{topic_prefix}_node_id') == int(n_id)), None)
             if n_player:
                 n_shares_data = n_player.field_maybe_none(f'{topic_prefix}_outgoing_shares')
                 if n_shares_data:
@@ -426,10 +426,10 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
         feed_item_ids = [str(item).strip().lower() for item in starting_items]
     else:
         # 3. Categorize into Strict Priorities (Retaining Weights)
-        p1_pool = {k: v for k, v in new_items.items() if k not in seen_history}  # Unseen last round
-        p2_pool = {k: v for k, v in backlog.items() if k not in seen_history}    # Unseen past rounds
-        p3_pool = {k: v for k, v in new_items.items() if k in seen_history}      # Seen last round
-        p4_pool = {k: v for k, v in backlog.items() if k in seen_history}        # Seen past rounds
+        p1_pool = {k: v for k, v in new_items.items() if k not in seen_history}                 # 1. Unseen last round
+        p2_pool = {k: v for k, v in backlog.items() if k not in seen_history and k not in p1_pool} # 2. Unseen past rounds
+        p3_pool = {k: v for k, v in new_items.items() if k in seen_history}                     # 3. Seen last round
+        p4_pool = {k: v for k, v in backlog.items() if k in seen_history and k not in p3_pool}    # 4. Seen past rounds
         
         # Helper to draw with weights without replacement
         def draw_from_weighted_pool(pool_dict, needed):
@@ -453,7 +453,8 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
         # Add new items to backlog for future rounds
         for k, v in new_items.items():
             clean_key = str(k).strip().lower()
-            backlog[clean_key] = backlog.get(clean_key, 0) + v
+            if clean_key not in shared_history:
+                backlog[clean_key] = backlog.get(clean_key, 0) + v
 
     # 4. Priority 5: General Pool (If still < 4)
     if len(feed_item_ids) < 4:
@@ -462,6 +463,11 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
         available_pool = [i for i in all_ids if i not in feed_item_ids and i not in seen_history and i not in shared_history and i != '']
         if available_pool:
             feed_item_ids.extend(random.sample(available_pool, min(needed, len(available_pool))))
+
+    # Remove items that were just placed into the current feed from the backlog (matches core_engine.py)
+    for item_id in feed_item_ids:
+        if item_id in backlog:
+            del backlog[item_id]
 
     # 5. Map IDs to actual item dictionaries
     feed_items = []
@@ -476,7 +482,7 @@ def build_topic_feed(player: Player, topic_prefix: str, news_db: list):
     setattr(player, f'{topic_prefix}_current_backlog', json.dumps(backlog))
     setattr(player, f'{topic_prefix}_incoming_feed', json.dumps(feed_items))
     setattr(player, f'{topic_prefix}_shown_ids', json.dumps(mapped_ids))
-
+    
 def generate_feed_for_player(player: Player):
     if player.participant.vars.get('screened_out', False):
         return
