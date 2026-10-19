@@ -39,8 +39,8 @@ class Constants(BaseConstants):
     
     PAY_PER_ROUND = 0.80
     FINAL_ROUND_PAY = 1.20
-    BONUS_AMOUNT = 3.00
-    LOTTERY_AMOUNT = 80.00
+    BONUS_AMOUNT = 2.00
+    LOTTERY_AMOUNT = 75.00
     MAX_ALLOWED_MISSES = 1
     
     # --- DYNAMIC MAP SELECTION ---
